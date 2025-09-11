@@ -6,7 +6,7 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver, Sender},
 };
-use kitebox_messages::Report;
+use kitesabre_messages::Report;
 use log::error;
 use rerun::Vec3D;
 use serialport::SerialPort;
@@ -14,7 +14,7 @@ use serialport::SerialPort;
 const BAUD_RATE: u32 = 115_200;
 
 /**
- * This program is used as the target.xtensa-esp32-none-elf.runner for kitebox.
+ * This program is used as the target.xtensa-esp32-none-elf.runner for kitesabre.
  *
  * This lets us send binary messages over the usb serial adapter and decode them for displaying
  * to the user or sending to rerun.io as we see fit.
@@ -26,10 +26,10 @@ async fn main(_spawner: Spawner) {
     println!("boxctl starting with args {}", args.join(" "));
 
     if args.get(1) == Some(&"flash".to_string()) {
-        // hack because we're forced to cd out of cross/kitebox to run cargo
+        // hack because we're forced to cd out of cross/kitesabre to run cargo
         let firmware_path = args[2].clone();
         if !std::fs::exists(&firmware_path).unwrap() {
-            let new_path = String::from("../cross/kitebox/") + &firmware_path;
+            let new_path = String::from("../cross/kitesabre/") + &firmware_path;
             if std::fs::exists(&new_path).unwrap() {
                 args[2] = new_path
             } else {
@@ -75,7 +75,7 @@ async fn main(_spawner: Spawner) {
 
     tty_tx.send("p".into()).await;
 
-    let rec = rerun::RecordingStreamBuilder::new("kiteboxcontrol")
+    let rec = rerun::RecordingStreamBuilder::new("kitesabre-control")
         .connect_grpc()
         .unwrap();
 

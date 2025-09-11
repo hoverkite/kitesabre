@@ -39,8 +39,8 @@ use esp_wifi::{
     esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo, BROADCAST_ADDRESS},
     init, EspWifiController,
 };
-use kitebox::messages::TtyCommand;
-use kitebox_messages::{Command, ImuData, Report, MAX_MESSAGE_SIZE};
+use kitesabre::messages::TtyCommand;
+use kitesabre_messages::{Command, ImuData, Report, MAX_MESSAGE_SIZE};
 use st3215::{messages::ServoIdOrBroadcast, registers::Register, servo_bus_async::ServoBusAsync};
 use static_cell::StaticCell;
 
@@ -268,11 +268,11 @@ async fn servo_bus_writer(
             TtyCommand::Query => bus.query_servo(servo_id).await.map(Some),
             TtyCommand::Release => bus.release_servo(servo_id).await.map(|()| None),
             TtyCommand::Binary(command) => match command {
-                kitebox_messages::Command::SetPosition(position) => bus
+                kitesabre_messages::Command::SetPosition(position) => bus
                     .write_register(servo_id.into(), Register::TargetLocation, position as u16)
                     .await
                     .map(|()| Some(position as u16)),
-                kitebox_messages::Command::NudgePosition(increment) => {
+                kitesabre_messages::Command::NudgePosition(increment) => {
                     bus.rotate_servo(servo_id, increment).await.map(Some)
                 }
             },
@@ -359,8 +359,8 @@ async fn esp_now_writer(
                     .or_else(|_| manager.fetch_peer(true))
                 {
                     Ok(peer) => match command {
-                        // FIXME: kill off the non-capnp commands and write a converter in
-                        // kiteboxcontrol if convenience is important.
+                        // FIXME: kill off the non-binary commands and write a converter in
+                        // kitesabre-control if convenience is important.
                         TtyCommand::Binary(command) => {
                             let bytes = command.to_vec().unwrap();
                             sender
@@ -439,7 +439,7 @@ async fn imu_reporter(
     let mut ticker = Ticker::every(Duration::from_millis(1000 / 25));
 
     // Sending BMI270_CONFIG_FILE takes sufficiently long (8192 bytes at 31 bytes per transaction)
-    // that kitebox-controller has typically had enough time to connect to the UART before we do
+    // that kitesabre-controller has typically had enough time to connect to the UART before we do
     // anything interesting. Hopefully this doesn't cause problems if run in parallel with
     // the main loop.
     if let Err(e) = imu.init(&bmi2::config::BMI270_CONFIG_FILE).await {
@@ -471,13 +471,13 @@ async fn imu_reporter(
         let status = imu.get_status().await.unwrap();
         if status.acc_data_ready {
             let data = imu.get_data().await.unwrap();
-            let acc = kitebox_messages::AxisData {
+            let acc = kitesabre_messages::AxisData {
                 // fixme: AccRange::Range2g.as_number() to make it easier to keep these things in sync?
                 x: data.acc.x as f32 * 2f32 / i16::MAX as f32,
                 y: data.acc.y as f32 * 2f32 / i16::MAX as f32,
                 z: data.acc.z as f32 * 2f32 / i16::MAX as f32,
             };
-            let gyr = kitebox_messages::AxisData {
+            let gyr = kitesabre_messages::AxisData {
                 // fixme: decide how to scale these
                 x: data.gyr.x as f32 / i16::MAX as f32,
                 y: data.gyr.y as f32 / i16::MAX as f32,

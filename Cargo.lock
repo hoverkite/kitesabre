@@ -4692,7 +4692,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
-name = "kitebox-messages"
+name = "kitesabre-control"
+version = "0.1.0"
+dependencies = [
+ "embassy",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-sync",
+ "kitesabre-messages",
+ "log",
+ "rerun",
+ "serialport 4.7.0",
+ "static_cell",
+]
+
+[[package]]
+name = "kitesabre-messages"
 version = "0.1.0"
 dependencies = [
  "bmi2",
@@ -4700,21 +4715,6 @@ dependencies = [
  "heapless 0.7.17",
  "postcard",
  "serde",
-]
-
-[[package]]
-name = "kiteboxcontrol"
-version = "0.1.0"
-dependencies = [
- "embassy",
- "embassy-executor",
- "embassy-futures",
- "embassy-sync",
- "kitebox-messages",
- "log",
- "rerun",
- "serialport 4.7.0",
- "static_cell",
 ]
 
 [[package]]

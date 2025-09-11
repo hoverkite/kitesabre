@@ -1,11 +1,11 @@
-# Kitebox firmware for hoverkite
+# kitesabre firmware for hoverkite
 
 This folder contains ESP32 firmware for a kite controller that lives in the sky and a ground station.
 
 This is inspired by the "soft kite variant" of the kitesforfuture.be project. See slide 13 of [this slide deck](https://www.kitesforfuture.de/FOSDEMSlides.pdf), or [this youtube video](https://www.youtube.com/watch?v=9IuRIYftyb0).
 
 The intention is that we ship exactly the same code to both the ground station and the box in
-the sky. The ground kitebox might be connected to a computer over usb, but not connected to a
+the sky. The ground kitesabre might be connected to a computer over usb, but not connected to a
 servo bus, but that's okay: the algorithm is still:
 
 * if you receive anything from tty_uart:
@@ -19,7 +19,7 @@ servo bus, but that's okay: the algorithm is still:
   * maybe we can log it later, or add metrics?
 
 ```
-             ground kitebox                       sky kitebox
+             ground kitesabre                       sky kitesabre
             ┌─────────────────────────┐          ┌─────────────────────────┐
             │                         │          │                         │
             │           esp <•••••••••••••••••••••••••••••• esp            │

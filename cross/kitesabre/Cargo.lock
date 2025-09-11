@@ -776,7 +776,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitebox"
+name = "kitesabre"
 version = "0.1.0"
 dependencies = [
  "bmi2",
@@ -795,7 +795,7 @@ dependencies = [
  "esp-println",
  "esp-wifi",
  "heapless 0.8.0",
- "kitebox-messages",
+ "kitesabre-messages",
  "log",
  "st3215",
  "static_cell",
@@ -803,7 +803,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitebox-messages"
+name = "kitesabre-messages"
 version = "0.1.0"
 dependencies = [
  "bmi2",

@@ -3,7 +3,7 @@
 resolver = "2"
 
 members = [
-    "kiteboxcontrol",
-    "kitebox-messages",
+    "kitesabre-control",
+    "kitesabre-messages",
     "st3215",
 ]

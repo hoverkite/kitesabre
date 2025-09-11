@@ -1,4 +1,4 @@
-use kitebox_messages::Command;
+use kitesabre_messages::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TtyCommand {
@@ -49,7 +49,7 @@ impl TtyCommand {
             }
             b'#' => {
                 // Read a COBS-encoded postcard message
-                let mut buffer = [0u8; kitebox_messages::MAX_MESSAGE_SIZE];
+                let mut buffer = [0u8; kitesabre_messages::MAX_MESSAGE_SIZE];
                 let mut idx = 0;
 
                 // Read until we get a zero byte (COBS terminator)

@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name    = "kitebox"
+name    = "kitesabre"
 version = "0.1.0"
 
 # We mark ourselves as a separate workspace to avoid being included in top-level host-arch builds
@@ -8,12 +8,12 @@ version = "0.1.0"
 resolver = "2"
 
 [[bin]]
-name = "kitebox"
+name = "kitesabre"
 path = "./src/bin/async_main.rs"
 
 [dependencies]
 st3215 = { path = "../../st3215" }
-kitebox-messages = { path = "../../kitebox-messages" }
+kitesabre-messages = { path = "../../kitesabre-messages" }
 
 bmi2 = { git="https://github.com/alsuren/bmi2", branch="async", features = ["async"] }
 embedded-io = "0.6.1"

@@ -14,7 +14,7 @@ structure of existing servo bus crates.
 The core of this crate is written in a sans-io style, so it **should** work with any blocking or
 async serial port implementation on Windows/MacOS/Linux/embedded/no_std.
 
-The primary user of this crate is the hoverkite project, for the ESP32 firmware of our kitebox
+The primary user of this crate is the hoverkite project, for the ESP32 firmware of our kitesabre
 kite control robot.
 This means that embassy + ESP32 on the Waveshare
 [General Driver For Robotics](https://www.waveshare.com/wiki/General_Driver_for_Robots) dev board is
