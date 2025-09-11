@@ -16,7 +16,6 @@ jobs:
       matrix:
         directory:
           - .
-          - cross/hoverkite-firmware
           - cross/kitesabre
     defaults:
       run:
@@ -33,7 +32,6 @@ jobs:
       matrix:
         directory:
           - .
-          - cross/hoverkite-firmware
           - cross/kitesabre
     defaults:
       run:
