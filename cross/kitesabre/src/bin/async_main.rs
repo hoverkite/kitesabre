@@ -41,7 +41,11 @@ use esp_wifi::{
 };
 use kitesabre::messages::TtyCommand;
 use kitesabre_messages::{Command, ImuData, Report, MAX_MESSAGE_SIZE};
-use st3215::{messages::ServoIdOrBroadcast, registers::Register, servo_bus_async::ServoBusAsync};
+use st3215::servo_bus_async::ServoBusError;
+use st3215::{
+    messages::ServoId, messages::ServoIdOrBroadcast, registers::Register,
+    servo_bus_async::ServoBusAsync,
+};
 use static_cell::StaticCell;
 
 const READ_BUF_SIZE: usize = 64;
@@ -204,10 +208,16 @@ async fn main_loop(
             Either3::Second(command) => command,
             Either3::Third(report) => {
                 to_tty_channel_sender.send(report).await;
-                if let Report::ImuData(imu_data) = report {
-                    let command = TtyCommand::Binary(Command::SetPosition(
-                        (f32::max(imu_data.acc.x + 1.0, 0.0) * 4000.0) as i64 as i16,
-                    ));
+                if let Report::ImuData(ImuData { acc, .. }) = report {
+                    let command = TtyCommand::Binary(Command::SetPositions {
+                        // Tilt forward/back lengthens both strings. Left/right controls difference.
+                        //
+                        // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4
+                        // so an offset of 1.5 offset should keep us mostly positive and linear.
+                        // We clamp to be >= 0 anyway for overflow safety if someone drops us.
+                        left: (f32::max(0.0, 1.5 + acc.y + acc.x) * 4000.0) as i64 as i16,
+                        right: (f32::max(0.0, 1.5 + acc.y - acc.x) * 4000.0) as i64 as i16,
+                    });
                     to_esp_now_channel_sender.send(command).await;
                     command
                 } else {
@@ -221,69 +231,75 @@ async fn main_loop(
     }
 }
 
+async fn get_servo_id(
+    bus: &mut ServoBusAsync<Uart<'static, Async>>,
+    candidate: ServoIdOrBroadcast,
+    cached_value: &mut Option<ServoId>,
+) -> Option<ServoId> {
+    match *cached_value {
+        Some(id) => Some(id),
+        None => {
+            *cached_value = bus.ping_servo(candidate).await.ok();
+            *cached_value
+        }
+    }
+}
+
 #[embassy_executor::task]
 async fn servo_bus_writer(
     command_receiver: Receiver<'static, CriticalSectionRawMutex, TtyCommand, 10>,
     mut bus: ServoBusAsync<Uart<'static, Async>>,
 ) {
-    let mut maybe_servo_id = bus.ping_servo(ServoIdOrBroadcast::BROADCAST).await.ok();
+    let mut maybe_servo_id_left = None;
+    let mut maybe_servo_id_right = None;
 
-    if let Some(servo_id) = maybe_servo_id {
-        bus.write_register(servo_id.into(), Register::MaximumAngleLimitation, 0)
+    // can also set AngularResolution to something bigger than 1 if we want to go even further.
+    // might also need LockMark?
+    if let Some(servo_id_left) =
+        get_servo_id(&mut bus, ServoIdOrBroadcast(2), &mut maybe_servo_id_left).await
+    {
+        bus.write_register(servo_id_left.into(), Register::MaximumAngleLimitation, 0)
             .await
             .unwrap();
-        // can also set AngularResolution to something bigger than 1 if we want to go even furter.
-        // might also need LockMark?
+    }
+    if let Some(servo_id_right) =
+        get_servo_id(&mut bus, ServoIdOrBroadcast(4), &mut maybe_servo_id_right).await
+    {
+        bus.write_register(servo_id_right.into(), Register::MaximumAngleLimitation, 0)
+            .await
+            .unwrap();
     }
 
     loop {
         let command = command_receiver.receive().await;
-        let servo_id = match maybe_servo_id {
-            Some(id) => id,
-            None => {
-                maybe_servo_id = bus.ping_servo(ServoIdOrBroadcast::BROADCAST).await.ok();
-                match maybe_servo_id {
-                    Some(id) => id,
-                    None => {
-                        let len = command_receiver.len();
-                        log::debug!("Could not find servo. Dropping {command:?} and {len} others.");
-                        command_receiver.clear();
-                        continue;
-                    }
-                }
-            }
-        };
 
-        log::info!("Sending command to servo bus: {command:?}");
-        let result = match command {
-            TtyCommand::Newline => Ok(None),
-            TtyCommand::Ping => bus
-                .ping_servo(servo_id.into())
-                .await
-                .map(|id| Some(id.into())),
-            TtyCommand::Up => bus.rotate_servo(servo_id, 100).await.map(Some),
-            TtyCommand::Down => bus.rotate_servo(servo_id, -100).await.map(Some),
-            TtyCommand::Left => bus.rotate_servo(servo_id, -10).await.map(Some),
-            TtyCommand::Right => bus.rotate_servo(servo_id, 10).await.map(Some),
-            TtyCommand::Query => bus.query_servo(servo_id).await.map(Some),
-            TtyCommand::Release => bus.release_servo(servo_id).await.map(|()| None),
-            TtyCommand::Binary(command) => match command {
-                kitesabre_messages::Command::SetPosition(position) => bus
-                    .write_register(servo_id.into(), Register::TargetLocation, position as u16)
-                    .await
-                    .map(|()| Some(position as u16)),
-                kitesabre_messages::Command::NudgePosition(increment) => {
-                    bus.rotate_servo(servo_id, increment).await.map(Some)
+        // TODO: DRY
+        let servo_id_left =
+            match get_servo_id(&mut bus, ServoIdOrBroadcast(2), &mut maybe_servo_id_left).await {
+                Some(id) => id,
+                None => {
+                    let len = command_receiver.len();
+                    log::debug!(
+                        "Could not find left servo. Dropping {command:?} and {len} others."
+                    );
+                    command_receiver.clear();
+                    continue;
                 }
-            },
-            TtyCommand::Unrecognised(other) => {
-                log::info!(
-                    "Unknown command (ascii {other}): {}",
-                    char::from_u32(other.into()).unwrap_or('?')
-                );
-                Ok(None)
-            }
-        };
+            };
+        let servo_id_right =
+            match get_servo_id(&mut bus, ServoIdOrBroadcast(4), &mut maybe_servo_id_right).await {
+                Some(id) => id,
+                None => {
+                    let len = command_receiver.len();
+                    log::debug!(
+                        "Could not find right servo. Dropping {command:?} and {len} others."
+                    );
+                    command_receiver.clear();
+                    continue;
+                }
+            };
+
+        let result = do_command(&mut bus, servo_id_left, servo_id_right, command).await;
         match result {
             Ok(None) => log::info!("Servo command `{command:?}` ok"),
             Ok(Some(val)) => {
@@ -292,6 +308,60 @@ async fn servo_bus_writer(
             // FIXME: handle timeout error here and maybe clear maybe_servo_id?
             Err(e) => log::error!("Servo {command:?} error: {}", e),
         };
+    }
+}
+
+async fn do_command(
+    bus: &mut ServoBusAsync<Uart<'static, Async>>,
+    servo_id_left: ServoId,
+    servo_id_right: ServoId,
+    command: TtyCommand,
+) -> Result<Option<u16>, ServoBusError> {
+    log::info!("Sending command to servo bus: {command:?}");
+    match command {
+        TtyCommand::Newline => Ok(None),
+        TtyCommand::Ping => bus
+            .ping_servo(servo_id_left.into())
+            .await
+            .map(|id| Some(id.into())),
+        TtyCommand::Up => bus.rotate_servo(servo_id_left, 100).await.map(Some),
+        TtyCommand::Down => bus.rotate_servo(servo_id_left, -100).await.map(Some),
+        TtyCommand::Left => bus.rotate_servo(servo_id_left, -10).await.map(Some),
+        TtyCommand::Right => bus.rotate_servo(servo_id_left, 10).await.map(Some),
+        TtyCommand::Query => bus.query_servo(servo_id_left).await.map(Some),
+        TtyCommand::Release => bus.release_servo(servo_id_left).await.map(|()| None),
+        TtyCommand::Binary(command) => match command {
+            kitesabre_messages::Command::SetPosition(position) => bus
+                .write_register(
+                    servo_id_left.into(),
+                    Register::TargetLocation,
+                    position as u16,
+                )
+                .await
+                .map(|()| Some(position as u16)),
+            kitesabre_messages::Command::NudgePosition(increment) => {
+                bus.rotate_servo(servo_id_left, increment).await.map(Some)
+            }
+            kitesabre_messages::Command::SetPositions { left, right } => {
+                bus.write_register(servo_id_left.into(), Register::TargetLocation, left as u16)
+                    .await?;
+                bus.write_register(
+                    servo_id_right.into(),
+                    Register::TargetLocation,
+                    right as u16,
+                )
+                .await?;
+
+                Ok::<_, ServoBusError>(Some(left as u16))
+            }
+        },
+        TtyCommand::Unrecognised(other) => {
+            log::info!(
+                "Unknown command (ascii {other}): {}",
+                char::from_u32(other.into()).unwrap_or('?')
+            );
+            Ok(None)
+        }
     }
 }
 

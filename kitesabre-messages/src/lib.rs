@@ -45,14 +45,11 @@ impl Report {
 pub enum Command {
     SetPosition(i16),
     NudgePosition(i16),
+    SetPositions { left: i16, right: i16 },
 }
 
 // FIXME: DRY
 impl Command {
-    // FIXME: if I know that I don't have any arrays in my structs, is there a way to get capnp
-    // to generate this max size directly?
-    pub const SEGMENT_ALLOCATOR_SIZE: usize = 128;
-
     pub fn to_vec<'a>(&self) -> Result<heapless::Vec<u8, MAX_MESSAGE_SIZE>, postcard::Error> {
         to_vec_cobs(self)
     }
