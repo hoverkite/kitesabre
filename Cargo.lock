@@ -498,16 +498,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bmi2"
-version = "0.1.1"
-source = "git+https://github.com/alsuren/bmi2?branch=async#0cffd040686c5d002ecbbc0b664409c2303c8f59"
-dependencies = [
- "embedded-hal 1.0.0",
- "embedded-hal-async",
- "fixedvec",
-]
-
-[[package]]
 name = "bstr"
 version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1541,12 +1531,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fixedvec"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b395ef2adf62bdeefcd1b59ad0dd2225c6c333ec79656ea79ac5285c46d051ea"
-
-[[package]]
 name = "flatbuffers"
 version = "25.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2297,7 +2281,6 @@ dependencies = [
 name = "kitesabre-messages"
 version = "0.1.0"
 dependencies = [
- "bmi2",
  "cobs 0.2.3",
  "heapless 0.7.17",
  "postcard",

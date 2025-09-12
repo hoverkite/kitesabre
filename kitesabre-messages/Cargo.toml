@@ -9,8 +9,3 @@ postcard = { version = "1.0.0", default-features = false, features = ["use-defmt
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 cobs = { version = "0.2.3", default-features = false }
 heapless = { version = "0.7", default-features = false }
-
-[dependencies.bmi2]
-git="https://github.com/alsuren/bmi2"
-branch="async"
-features = ["async"]
