@@ -235,18 +235,22 @@ async fn main_loop(
     }
 }
 
-async fn get_servo_id(
+async fn get_servo_id_and_maybe_init(
     bus: &mut ServoBusAsync<Uart<'static, Async>>,
     candidate: ServoIdOrBroadcast,
     cached_value: &mut Option<ServoId>,
 ) -> Option<ServoId> {
-    match *cached_value {
-        Some(id) => Some(id),
-        None => {
-            *cached_value = bus.ping_servo(candidate).await.ok();
-            *cached_value
+    if cached_value.is_none() {
+        *cached_value = bus.ping_servo(candidate).await.ok();
+        if let Some(servo_id) = *cached_value {
+            // can also set AngularResolution to something bigger than 1 if we want to go even further.
+            // might also need LockMark?
+            bus.write_register(servo_id.into(), Register::MaximumAngleLimitation, 0)
+                .await
+                .unwrap();
         }
     }
+    *cached_value
 }
 
 #[embassy_executor::task]
@@ -257,51 +261,41 @@ async fn servo_bus_writer(
     let mut maybe_servo_id_left = None;
     let mut maybe_servo_id_right = None;
 
-    // can also set AngularResolution to something bigger than 1 if we want to go even further.
-    // might also need LockMark?
-    if let Some(servo_id_left) =
-        get_servo_id(&mut bus, ServoIdOrBroadcast(2), &mut maybe_servo_id_left).await
-    {
-        bus.write_register(servo_id_left.into(), Register::MaximumAngleLimitation, 0)
-            .await
-            .unwrap();
-    }
-    if let Some(servo_id_right) =
-        get_servo_id(&mut bus, ServoIdOrBroadcast(4), &mut maybe_servo_id_right).await
-    {
-        bus.write_register(servo_id_right.into(), Register::MaximumAngleLimitation, 0)
-            .await
-            .unwrap();
-    }
-
     loop {
         let command = command_receiver.receive().await;
 
         // TODO: DRY
-        let servo_id_left =
-            match get_servo_id(&mut bus, ServoIdOrBroadcast(2), &mut maybe_servo_id_left).await {
-                Some(id) => id,
-                None => {
-                    let len = command_receiver.len();
-                    log::debug!(
-                        "Could not find left servo. Dropping {command:?} and {len} others."
-                    );
-                    command_receiver.clear();
-                    continue;
-                }
-            };
-        let servo_id_right =
-            match get_servo_id(&mut bus, ServoIdOrBroadcast(4), &mut maybe_servo_id_right).await {
-                Some(id) => id,
-                None => {
-                    let len = command_receiver.len();
-                    log::debug!(
-                        "Could not find right servo. Dropping {command:?} and {len} others."
-                    );
-                    command_receiver.clear();
-                    continue;
-                }
-            };
+        let servo_id_left = match get_servo_id_and_maybe_init(
+            &mut bus,
+            ServoIdOrBroadcast(2),
+            &mut maybe_servo_id_left,
+        )
+        .await
+        {
+            Some(id) => id,
+            None => {
+                let len = command_receiver.len();
+                log::debug!("Could not find left servo. Dropping {command:?} and {len} others.");
+                command_receiver.clear();
+                continue;
+            }
+        };
+
+        let servo_id_right = match get_servo_id_and_maybe_init(
+            &mut bus,
+            ServoIdOrBroadcast(4),
+            &mut maybe_servo_id_right,
+        )
+        .await
+        {
+            Some(id) => id,
+            None => {
+                let len = command_receiver.len();
+                log::debug!("Could not find right servo. Dropping {command:?} and {len} others.");
+                command_receiver.clear();
+                continue;
+            }
+        };
 
         let result = do_command(&mut bus, servo_id_left, servo_id_right, command).await;
         match result {
@@ -356,8 +350,8 @@ async fn do_command(
                 // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4
                 // so an offset of 1.5 offset should keep us mostly positive and linear.
                 // We clamp to be >= 0 anyway for overflow safety if someone drops us.
-                let left = (f32::max(0.0, 1.5 + left) * 4000.0) as i64 as i16;
-                let right = (f32::max(0.0, 1.5 - right) * 4000.0) as i64 as i16;
+                let left = (f32::max(0.0, 1.5 + left) * 8000.0) as i64 as i16;
+                let right = (f32::max(0.0, 1.5 - right) * 8000.0) as i64 as i16;
                 log::info!("left = {left}, right = {right}");
                 bus.write_register(servo_id_left.into(), Register::TargetLocation, left as u16)
                     .await?;
