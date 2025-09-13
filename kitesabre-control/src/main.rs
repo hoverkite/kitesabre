@@ -6,6 +6,7 @@ use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver, Sender},
 };
+use kitesabre_messages::Command;
 use kitesabre_messages::Report;
 use log::error;
 use rerun::Vec3D;
@@ -115,6 +116,17 @@ async fn main(_spawner: Spawner) {
                         )
                         .unwrap();
                     }
+                    Report::Command(Command::SetPositions { left, right }) => {
+                        rec.log(
+                            "command/positions",
+                            &rerun::Arrows3D::from_vectors([
+                                Vec3D::new(left, 0.1, 0.0),
+                                Vec3D::new(right, -0.1, 0.0),
+                            ]),
+                        )
+                        .unwrap();
+                    }
+                    Report::Command(_) => {}
                 },
             },
         };

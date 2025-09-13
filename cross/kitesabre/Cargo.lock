@@ -806,7 +806,6 @@ dependencies = [
 name = "kitesabre-messages"
 version = "0.1.0"
 dependencies = [
- "bmi2",
  "cobs 0.2.3",
  "heapless 0.7.17",
  "postcard",

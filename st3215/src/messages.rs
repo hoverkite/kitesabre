@@ -267,8 +267,10 @@ impl ReplyPacket {
         let mut checksum = [0u8; 1];
         stream.read_exact(&mut checksum)?;
 
-        // FIXME: add an error variant for this instead of panicking
-        assert_eq!(res.checksum(), checksum[0]);
+        if res.checksum() != checksum[0] {
+            log::error!("checksums don't match (FIXME: this should not be an UnexpectedEof error)");
+            return Err(ReadExactError::UnexpectedEof);
+        }
         Ok(res)
     }
 
@@ -295,8 +297,10 @@ impl ReplyPacket {
         let mut checksum = [0u8; 1];
         stream.read_exact(&mut checksum).await?;
 
-        // FIXME: add an error variant for this instead of panicking
-        assert_eq!(res.checksum(), checksum[0]);
+        if res.checksum() != checksum[0] {
+            log::error!("checksums don't match (FIXME: this should not be an UnexpectedEof error)");
+            return Err(ReadExactError::UnexpectedEof);
+        }
         Ok(res)
     }
     pub(crate) fn checksum(&self) -> u8 {
