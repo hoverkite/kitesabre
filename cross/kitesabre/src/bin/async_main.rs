@@ -206,20 +206,24 @@ async fn main_loop(
                 command
             }
             Either3::Second(command) => command,
-            Either3::Third(report) => {
-                to_tty_channel_sender.send(report).await;
-                if let Report::ImuData(ImuData { acc, .. }) = report {
-                    let command = TtyCommand::Binary(Command::SetPositions {
+            Either3::Third(imu_channel_report) => {
+                to_tty_channel_sender.send(imu_channel_report).await;
+                if let Report::ImuData(ImuData { acc, .. }) = imu_channel_report {
+                    let command = Command::SetPositions {
                         // Tilt forward/back lengthens both strings. Left/right controls difference.
                         //
                         // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4
                         // so an offset of 1.5 offset should keep us mostly positive and linear.
                         // We clamp to be >= 0 anyway for overflow safety if someone drops us.
-                        left: (f32::max(0.0, 1.5 + acc.y + acc.x) * 4000.0) as i64 as i16,
-                        right: (f32::max(0.0, 1.5 + acc.y - acc.x) * 4000.0) as i64 as i16,
-                    });
-                    to_esp_now_channel_sender.send(command).await;
-                    command
+                        left: acc.y + acc.x,
+                        right: acc.y - acc.x,
+                    };
+                    // Also send the generated command to tty for rerun to visualise it.
+                    to_tty_channel_sender.send(Report::Command(command)).await;
+
+                    let tty_command = TtyCommand::Binary(command);
+                    to_esp_now_channel_sender.send(tty_command).await;
+                    tty_command
                 } else {
                     TtyCommand::Unrecognised(b'X')
                 }
@@ -301,9 +305,9 @@ async fn servo_bus_writer(
 
         let result = do_command(&mut bus, servo_id_left, servo_id_right, command).await;
         match result {
-            Ok(None) => log::info!("Servo command `{command:?}` ok"),
+            Ok(None) => log::debug!("Servo command `{command:?}` ok"),
             Ok(Some(val)) => {
-                log::info!("Servo command `{command:?}` ok. New value: {val}")
+                log::debug!("Servo command `{command:?}` ok. New value: {val}")
             }
             // FIXME: handle timeout error here and maybe clear maybe_servo_id?
             Err(e) => log::error!("Servo {command:?} error: {}", e),
@@ -317,7 +321,7 @@ async fn do_command(
     servo_id_right: ServoId,
     command: TtyCommand,
 ) -> Result<Option<u16>, ServoBusError> {
-    log::info!("Sending command to servo bus: {command:?}");
+    log::debug!("Sending command to servo bus: {command:?}");
     match command {
         TtyCommand::Newline => Ok(None),
         TtyCommand::Ping => bus
@@ -329,7 +333,11 @@ async fn do_command(
         TtyCommand::Left => bus.rotate_servo(servo_id_left, -10).await.map(Some),
         TtyCommand::Right => bus.rotate_servo(servo_id_left, 10).await.map(Some),
         TtyCommand::Query => bus.query_servo(servo_id_left).await.map(Some),
-        TtyCommand::Release => bus.release_servo(servo_id_left).await.map(|()| None),
+        TtyCommand::Release => {
+            bus.release_servo(servo_id_left).await?;
+            bus.release_servo(servo_id_right).await?;
+            Ok(None)
+        }
         TtyCommand::Binary(command) => match command {
             kitesabre_messages::Command::SetPosition(position) => bus
                 .write_register(
@@ -343,6 +351,14 @@ async fn do_command(
                 bus.rotate_servo(servo_id_left, increment).await.map(Some)
             }
             kitesabre_messages::Command::SetPositions { left, right } => {
+                // Tilt forward/back lengthens both strings. Left/right controls difference.
+                //
+                // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4
+                // so an offset of 1.5 offset should keep us mostly positive and linear.
+                // We clamp to be >= 0 anyway for overflow safety if someone drops us.
+                let left = (f32::max(0.0, 1.5 + left) * 4000.0) as i64 as i16;
+                let right = (f32::max(0.0, 1.5 - right) * 4000.0) as i64 as i16;
+                log::info!("left = {left}, right = {right}");
                 bus.write_register(servo_id_left.into(), Register::TargetLocation, left as u16)
                     .await?;
                 bus.write_register(
@@ -480,7 +496,7 @@ async fn esp_now_reader(
             }
         } else {
             let data = r.data();
-            log::info!("Received {:?}", data);
+            log::debug!("Received {:?}", data);
             let command = if data.len() == 1 {
                 TtyCommand::read_async(data).await.unwrap()
             } else {
@@ -503,7 +519,7 @@ async fn esp_now_reader(
 #[embassy_executor::task]
 async fn imu_reporter(
     mut imu: IMU,
-    to_tty_channel_sender: Sender<'static, CriticalSectionRawMutex, Report, 10>,
+    from_imu_channel_sender: Sender<'static, CriticalSectionRawMutex, Report, 10>,
 ) {
     log::info!("imu_reporter");
     let mut ticker = Ticker::every(Duration::from_millis(1000 / 25));
@@ -559,7 +575,7 @@ async fn imu_reporter(
                 time: data.time,
             });
 
-            to_tty_channel_sender.send(message).await;
+            from_imu_channel_sender.send(message).await;
         }
     }
 }

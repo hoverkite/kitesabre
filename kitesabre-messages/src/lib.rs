@@ -29,6 +29,7 @@ pub struct Time {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Report {
     ImuData(ImuData),
+    Command(Command),
     Time(Time),
 }
 
@@ -41,11 +42,14 @@ impl Report {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+// STFU about NaNs
+impl Eq for Command {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum Command {
     SetPosition(i16),
     NudgePosition(i16),
-    SetPositions { left: i16, right: i16 },
+    SetPositions { left: f32, right: f32 },
 }
 
 // FIXME: DRY
