@@ -241,16 +241,46 @@ async fn get_servo_id_and_maybe_init(
     cached_value: &mut Option<ServoId>,
 ) -> Option<ServoId> {
     if cached_value.is_none() {
-        *cached_value = bus.ping_servo(candidate).await.ok();
-        if let Some(servo_id) = *cached_value {
+        if let Some(servo_id) = bus.ping_servo(candidate).await.ok() {
+            log::info!("Initializing servo {servo_id:?}");
             // can also set AngularResolution to something bigger than 1 if we want to go even further.
             // might also need LockMark?
             bus.write_register(servo_id.into(), Register::MaximumAngleLimitation, 0)
                 .await
                 .unwrap();
+            *cached_value = Some(servo_id);
         }
     }
     *cached_value
+}
+
+async fn find_servos_and_maybe_init(
+    bus: &mut ServoBusAsync<Uart<'static, Async>>,
+    cached_values: &mut (Option<ServoId>, Option<ServoId>),
+) {
+    // One set of servo sets that I have is left: 2, right: 4.
+    // The other is left: 5, right: 6.
+    if cached_values.0.is_none() {
+        for i in 1..10 {
+            if get_servo_id_and_maybe_init(bus, ServoIdOrBroadcast(i), &mut cached_values.0)
+                .await
+                .is_some()
+            {
+                break;
+            }
+        }
+    }
+
+    if let (Some(left_id), None) = cached_values {
+        for i in (u8::from(*left_id) + 1)..10 {
+            if get_servo_id_and_maybe_init(bus, ServoIdOrBroadcast(i), &mut cached_values.1)
+                .await
+                .is_some()
+            {
+                break;
+            }
+        }
+    }
 }
 
 #[embassy_executor::task]
@@ -258,40 +288,24 @@ async fn servo_bus_writer(
     command_receiver: Receiver<'static, CriticalSectionRawMutex, TtyCommand, 10>,
     mut bus: ServoBusAsync<Uart<'static, Async>>,
 ) {
-    let mut maybe_servo_id_left = None;
-    let mut maybe_servo_id_right = None;
+    let mut maybe_servo_ids = (None, None);
 
     loop {
         let command = command_receiver.receive().await;
 
-        // TODO: DRY
-        let servo_id_left = match get_servo_id_and_maybe_init(
-            &mut bus,
-            ServoIdOrBroadcast(2),
-            &mut maybe_servo_id_left,
-        )
-        .await
-        {
-            Some(id) => id,
-            None => {
+        find_servos_and_maybe_init(&mut bus, &mut maybe_servo_ids).await;
+
+        let (servo_id_left, servo_id_right) = match maybe_servo_ids {
+            (Some(l), Some(r)) => (l, r),
+            (Some(_), _) => {
                 let len = command_receiver.len();
-                log::debug!("Could not find left servo. Dropping {command:?} and {len} others.");
+                log::debug!("Could not find right servo. Dropping {command:?} and {len} others.");
                 command_receiver.clear();
                 continue;
             }
-        };
-
-        let servo_id_right = match get_servo_id_and_maybe_init(
-            &mut bus,
-            ServoIdOrBroadcast(4),
-            &mut maybe_servo_id_right,
-        )
-        .await
-        {
-            Some(id) => id,
-            None => {
+            (_, _) => {
                 let len = command_receiver.len();
-                log::debug!("Could not find right servo. Dropping {command:?} and {len} others.");
+                log::debug!("Could not find left servo. Dropping {command:?} and {len} others.");
                 command_receiver.clear();
                 continue;
             }

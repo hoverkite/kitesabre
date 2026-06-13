@@ -81,9 +81,14 @@ impl ServoId {
         }
     }
 }
-impl Into<u16> for ServoId {
-    fn into(self) -> u16 {
-        self.0.into()
+impl From<ServoId> for u8 {
+    fn from(val: ServoId) -> Self {
+        val.0
+    }
+}
+impl From<ServoId> for u16 {
+    fn from(val: ServoId) -> Self {
+        val.0.into()
     }
 }
 
