@@ -2,8 +2,6 @@
 #![no_main]
 #![doc = include_str!("../../README.md")]
 
-use core::i16;
-
 use bmi2::{
     bmi2_async::Bmi2,
     interface::I2cInterface,
@@ -84,7 +82,7 @@ async fn main(spawner: Spawner) {
         .unwrap()
     );
     let wifi = peripherals.WIFI;
-    let esp_now = esp_wifi::esp_now::EspNow::new(&esp_wifi_ctrl, wifi).unwrap();
+    let esp_now = esp_wifi::esp_now::EspNow::new(esp_wifi_ctrl, wifi).unwrap();
     log::info!("esp-now version {}", esp_now.version().unwrap());
 
     let (manager, sender, receiver) = esp_now.split();
@@ -241,7 +239,7 @@ async fn get_servo_id_and_maybe_init(
     cached_value: &mut Option<ServoId>,
 ) -> Option<ServoId> {
     if cached_value.is_none() {
-        if let Some(servo_id) = bus.ping_servo(candidate).await.ok() {
+        if let Ok(servo_id) = bus.ping_servo(candidate).await {
             log::info!("Initializing servo {servo_id:?}");
             // can also set AngularResolution to something bigger than 1 if we want to go even further.
             // might also need LockMark?
