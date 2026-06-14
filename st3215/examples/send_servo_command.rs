@@ -151,14 +151,18 @@ fn main() {
     .expect("Failed to open serial port");
     dbg!(serial_port.settings());
 
+    let mut serial_port = embedded_io_adapters::std::FromStd::new(serial_port);
+
     send_and_print_response(&mut serial_port, packet);
 }
 
-fn send_and_print_response(serial_port: &mut Box<dyn SerialPort>, packet: InstructionPacket) {
+fn send_and_print_response<R: embedded_io::Read + embedded_io::Write>(
+    mut serial_port: &mut R,
+    packet: InstructionPacket,
+) {
     serial_port
         .write_all(&packet.to_buf())
         .expect("Failed to write to serial port");
-    let mut serial_port = embedded_io_adapters::std::FromStd::new(serial_port);
 
     let response = ReplyPacket::read(&mut serial_port).expect("Failed to read response");
     // println!("{:?}", response);

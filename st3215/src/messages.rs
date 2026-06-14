@@ -252,7 +252,7 @@ pub struct ReplyPacket {
 }
 
 impl ReplyPacket {
-    pub fn read<R: embedded_io::Read>(mut stream: R) -> Result<Self, ReadExactError<R::Error>> {
+    pub fn read<R: embedded_io::Read>(stream: &mut R) -> Result<Self, ReadExactError<R::Error>> {
         let mut buffer = [0u8; 5];
         stream.read_exact(&mut buffer)?;
         assert!(buffer[0] == 0xff);
