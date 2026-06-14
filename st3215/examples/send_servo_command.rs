@@ -1,4 +1,4 @@
-use serialport::{SerialPort, SerialPortSettings};
+use serialport::SerialPortSettings;
 use st3215::{
     messages::Instruction, messages::InstructionPacket, messages::ReplyPacket,
     messages::ServoIdOrBroadcast, registers::Register,
@@ -85,7 +85,7 @@ fn main() {
     };
 
     if command == "readall" {
-        let mut serial_port = serialport::open_with_settings(
+        let serial_port = serialport::open_with_settings(
             serial_port_path,
             &SerialPortSettings {
                 baud_rate,
@@ -94,6 +94,7 @@ fn main() {
             },
         )
         .expect("Failed to open serial port");
+        let mut serial_port = embedded_io_adapters::std::FromStd::new(serial_port);
 
         for register in Register::iter() {
             let packet = InstructionPacket {
@@ -102,6 +103,7 @@ fn main() {
             };
             send_and_print_response(&mut serial_port, packet)
         }
+        return;
     }
 
     // FIXME: write this using a proper argument parsing library and use named flags instead of
@@ -112,18 +114,18 @@ fn main() {
             instruction: Instruction::Ping,
         },
         "read" => {
-            let head_address = parse_hex(&args[4]);
-            let register =
-                Register::from_memory_address(head_address).expect("Invalid head address");
+            let register = Register::from_str(&args[4])
+                .or_else(|| Register::from_memory_address(parse_hex(&args[4])))
+                .expect("Invalid head address");
             InstructionPacket {
                 id,
                 instruction: Instruction::read_register(register),
             }
         }
         "write" => {
-            let head_address = parse_hex(&args[4]);
-            let register =
-                Register::from_memory_address(head_address).expect("Invalid head address");
+            let register = Register::from_str(&args[4])
+                .or_else(|| Register::from_memory_address(parse_hex(&args[4])))
+                .expect("Invalid head address");
             let value = parse_hex_u16(&args[5]);
             InstructionPacket {
                 id,
@@ -140,7 +142,7 @@ fn main() {
         }
     };
 
-    let mut serial_port = serialport::open_with_settings(
+    let serial_port = serialport::open_with_settings(
         serial_port_path,
         &SerialPortSettings {
             baud_rate,
@@ -149,8 +151,7 @@ fn main() {
         },
     )
     .expect("Failed to open serial port");
-    dbg!(serial_port.settings());
-
+    // dbg!(serial_port.settings());
     let mut serial_port = embedded_io_adapters::std::FromStd::new(serial_port);
 
     send_and_print_response(&mut serial_port, packet);
@@ -178,7 +179,20 @@ fn send_and_print_response<R: embedded_io::Read + embedded_io::Write>(
                 response.interpret_as_register(register)
             );
         }
-        Instruction::WriteData { .. } => {}
+        Instruction::WriteData { head_address, data } => {
+            println!("write response is {response:?}");
+            // read what we wrote
+            send_and_print_response(
+                serial_port,
+                InstructionPacket {
+                    id: packet.id,
+                    instruction: Instruction::ReadData {
+                        head_address,
+                        length: data.len() as u8,
+                    },
+                },
+            )
+        }
         _ => todo!(),
     }
 }

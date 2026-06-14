@@ -186,6 +186,35 @@ mod codegen {
 
         // FIXME: there are crates that can derive this.
         // Decide whether we're happy to take the compile-time hit.
+        // from_str()
+        result.push_str(
+            &dedent(
+                r#"
+            
+                pub fn from_str(str: &str) -> Option<Self> {
+                    match str {
+            "#,
+            )[1..],
+        );
+        for register in &registers {
+            let variant_name = &register.variant_name;
+            result.push_str(&format!(
+                "            \"{variant_name}\" => Some(Self::{variant_name}),\n"
+            ));
+        }
+        result.push_str(
+            &dedent_last(
+                r#"
+                    _ => None,
+                }
+            }
+        "#,
+            )
+            .trim_start_matches("\n"),
+        );
+
+        // FIXME: there are crates that can derive this.
+        // Decide whether we're happy to take the compile-time hit.
         // from_memory_address()
         result.push_str(
             &dedent(
