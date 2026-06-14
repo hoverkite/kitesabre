@@ -241,8 +241,12 @@ async fn get_servo_id_and_maybe_init(
     if cached_value.is_none() {
         if let Ok(servo_id) = bus.ping_servo(candidate).await {
             log::info!("Initializing servo {servo_id:?}");
+            // MaximumAngleLimitation is set to 0 to put it in "multi turn absolute position control" mode.
             // can also set AngularResolution to something bigger than 1 if we want to go even further.
             // might also need LockMark?
+            bus.write_register(servo_id.into(), Register::MinimumAngleLimitation, 0)
+                .await
+                .unwrap();
             bus.write_register(servo_id.into(), Register::MaximumAngleLimitation, 0)
                 .await
                 .unwrap();
@@ -357,20 +361,28 @@ async fn do_command(
                 bus.rotate_servo(servo_id_left, increment).await.map(Some)
             }
             kitesabre_messages::Command::SetPositions { left, right } => {
-                // Tilt forward/back lengthens both strings. Left/right controls difference.
-                //
-                // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4
-                // so an offset of 1.5 offset should keep us mostly positive and linear.
-                // We clamp to be >= 0 anyway for overflow safety if someone drops us.
-                let left = (f32::max(0.0, 1.5 + left) * 8000.0) as i64 as i16;
-                let right = (f32::max(0.0, 1.5 - right) * 8000.0) as i64 as i16;
-                log::info!("left = {left}, right = {right}");
-                bus.write_register(servo_id_left.into(), Register::TargetLocation, left as u16)
+                fn encode_position(pos: f32) -> u16 {
+                    // Tilt forward/back lengthens both strings. Left/right controls difference.
+                    //
+                    // Under 1G of gravity, acc is a unit vector. max(x + y) = sqrt(2) ~= 1.4.
+                    // We clamp to be in [-1.5, 1.5] anyway for overflow safety if someone drops us.
+                    let pos = (pos.clamp(-1.5, 1.5) * 8000.0) as i64 as i16;
+                    // STM3215 uses a sign bit rather than 2s compliment.
+                    if pos < 0 {
+                        0x8000 | ((-pos) as u16)
+                    } else {
+                        pos as u16
+                    }
+                }
+                let left_encoded = encode_position(left);
+                let right_encoded = encode_position(right);
+                log::info!("left = {left} ({left_encoded}), right = {right} ({right_encoded})");
+                bus.write_register(servo_id_left.into(), Register::TargetLocation, left_encoded)
                     .await?;
                 bus.write_register(
                     servo_id_right.into(),
                     Register::TargetLocation,
-                    right as u16,
+                    right_encoded,
                 )
                 .await?;
 
