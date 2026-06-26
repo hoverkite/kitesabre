@@ -20,6 +20,22 @@
       </div>
 
       <div class="section">
+        <h2>Incoming Data</h2>
+        <div class="controls">
+          <button id="clearLogBtn">Clear Log</button>
+          <label>
+            <input type="checkbox" id="autoscroll" checked />
+            Auto-scroll
+          </label>
+          <label>
+            <input type="checkbox" id="showRaw" checked />
+            Show raw bytes
+          </label>
+        </div>
+        <div id="dataLog" class="log"></div>
+      </div>
+
+      <div class="section">
         <h2>Send Commands</h2>
         <div class="command-group">
           <label for="commandInput">Text Command:</label>
@@ -40,22 +56,6 @@
           <button class="quick-cmd" data-cmd="&gt;">Right (&gt;)</button>
         </div>
         <div id="lastCommandSent" class="status">No command sent yet</div>
-      </div>
-
-      <div class="section">
-        <h2>Incoming Data</h2>
-        <div class="controls">
-          <button id="clearLogBtn">Clear Log</button>
-          <label>
-            <input type="checkbox" id="autoscroll" checked />
-            Auto-scroll
-          </label>
-          <label>
-            <input type="checkbox" id="showRaw" checked />
-            Show raw bytes
-          </label>
-        </div>
-        <div id="dataLog" class="log"></div>
       </div>
     </div>
 
