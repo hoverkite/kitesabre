@@ -124,19 +124,30 @@ A Rust WASM package used by the web app to encode outgoing commands and decode i
 Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 
 ### Legacy mapping to preserve
-- Axis LeftStickY -> left offset
-- Axis RightStickY -> right offset
-- DPadLeft/Right -> scale -/+ 1
-- DPadUp/Down -> max torque negative limit adjust by 10
-- LeftTrigger / LeftTrigger2 -> left centre +/- 20
-- RightTrigger / RightTrigger2 -> right centre +/- 20
-- LeftThumb / RightThumb -> recenter left/right
-- South -> battery report
-- East -> remove target
-- West / North -> spring constant -/+ 2
-- Mode -> power off
+- [trivial] Axis LeftStickY -> left offset
+- [trivial] Axis RightStickY -> right offset
+- [browser state] DPadLeft/Right -> scale -/+ 1
+- [browser state] LeftTrigger / LeftTrigger2 -> left centre +/- 20
+- [browser state] RightTrigger / RightTrigger2 -> right centre +/- 20
+- [browser state] LeftThumb / RightThumb -> recenter left/right
+- [rust-side] DPadUp/Down -> max torque negative limit adjust by 10
+- [rust-side] East -> remove target
+- [rust-side] West / North -> spring constant -/+ 2
+- [rust-side] Mode -> power off
+- [new board-side code] South -> battery report
 
 ### Adaptation for Kitesabre
+#### Easy
+1. Define unsupported or deferred actions explicitly.
+- If firmware lacks a direct equivalent for a legacy command, log and document fallback behavior.
+
+2. Add parity verification checklist.
+- For each mapped control, verify expected physical or telemetry behavior against old hovercontrol behavior.
+
+3. Keep browser-owned state persistent across refreshes.
+- Store offsets, scale, center adjustments, and other local mapping state in localStorage so controls survive reloads.
+
+#### Hard
 1. Map legacy intent to current kitesabre command model.
 - Primary continuous control path should use SetPositions { left, right }.
 - Define how centre/scale/max torque/spring constants are represented in current firmware commands or local state.
@@ -146,11 +157,11 @@ Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 - Apply deadzone, scaling, centre offsets.
 - Emit command updates at fixed cadence (for example 50 Hz) with change detection.
 
-3. Define unsupported or deferred actions explicitly.
-- If firmware lacks a direct equivalent for a legacy command, log and document fallback behavior.
-
-4. Add parity verification checklist.
-- For each mapped control, verify expected physical or telemetry behavior against old hovercontrol behavior.
+3. Implement battery reporting for South. (implementation plan is pure slop. Read the data sheet and check for pre-existing crates, or implement your own)
+- Read the board battery rail on the ESP32, most likely through an ADC input and a resistor divider or existing measurement circuit.
+- Calibrate raw ADC readings into volts, then surface them as a new report in the firmware message path.
+- Keep the legacy ASCII battery command as a fallback if that is still useful for manual testing.
+- If the board does not already expose a battery sense circuit, this needs board-specific hardware work before software can report it reliably.
 
 ### Acceptance criteria
 - Continuous dual-stick control works with equivalent feel to hovercontrol baseline.
