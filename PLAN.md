@@ -124,17 +124,17 @@ A Rust WASM package used by the web app to encode outgoing commands and decode i
 Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 
 ### Legacy mapping to preserve
-- [trivial] Axis LeftStickY -> left offset
-- [trivial] Axis RightStickY -> right offset
-- [browser state] DPadLeft/Right -> scale -/+ 1
-- [browser state] LeftTrigger / LeftTrigger2 -> left centre +/- 20
-- [browser state] RightTrigger / RightTrigger2 -> right centre +/- 20
-- [browser state] LeftThumb / RightThumb -> recenter left/right
-- [rust-side] DPadUp/Down -> max torque negative limit adjust by 10
-- [rust-side] East -> remove target
-- [rust-side] West / North -> spring constant -/+ 2
-- [rust-side] Mode -> power off
-- [new board-side code] South -> battery report
+- [x] [trivial] Axis LeftStickY -> left offset
+- [x] [trivial] Axis RightStickY -> right offset
+- [ ] [browser state] DPadLeft/Right -> scale -/+ 1
+- [ ] [browser state] LeftTrigger / LeftTrigger2 -> left centre +/- 20
+- [ ] [browser state] RightTrigger / RightTrigger2 -> right centre +/- 20
+- [ ] [browser state] LeftThumb / RightThumb -> recenter left/right
+- [ ] [rust-side] DPadUp/Down -> max torque negative limit adjust by 10
+- [ ] [rust-side] East -> remove target
+- [ ] [rust-side] West / North -> spring constant -/+ 2
+- [ ] [rust-side] Mode -> power off
+- [ ] [new board-side code] South -> battery report
 
 ### Adaptation for Kitesabre
 #### Easy
