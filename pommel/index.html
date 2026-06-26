@@ -61,6 +61,16 @@
           <button class="quick-cmd" data-cmd="&lt;">Left (&lt;)</button>
           <button class="quick-cmd" data-cmd="&gt;">Right (&gt;)</button>
         </div>
+        <div class="command-group">
+          <label for="binaryCommandInput">Binary Command JSON:</label>
+          <input
+            type="text"
+            id="binaryCommandInput"
+            value='{"SetPositions":{"left":0.0,"right":0.0}}'
+            maxlength="120"
+          />
+          <button id="sendBinaryBtn">Send Binary</button>
+        </div>
         <div id="lastCommandSent" class="status">No command sent yet</div>
       </details>
 
@@ -70,15 +80,28 @@
         </summary>
         <div class="controls">
           <label for="deadzoneInput">Deadzone:</label>
-          <input type="number" id="deadzoneInput" min="0" max="0.5" step="0.01" value="0.08" />
+          <input
+            type="number"
+            id="deadzoneInput"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value="0.08"
+          />
           <span id="pollRate" class="pill">Polling: 0 Hz</span>
         </div>
         <div id="gamepadStatus" class="status">No gamepad connected</div>
         <div class="diag-grid">
           <div class="diag-card">
             <h3>Axes</h3>
-            <p>Left Stick Y: <strong id="leftStickYRaw">0.000</strong> raw / <strong id="leftStickYNorm">0.000</strong> normalized</p>
-            <p>Right Stick Y: <strong id="rightStickYRaw">0.000</strong> raw / <strong id="rightStickYNorm">0.000</strong> normalized</p>
+            <p>
+              Left Stick Y: <strong id="leftStickYRaw">0.000</strong> raw /
+              <strong id="leftStickYNorm">0.000</strong> normalized
+            </p>
+            <p>
+              Right Stick Y: <strong id="rightStickYRaw">0.000</strong> raw /
+              <strong id="rightStickYNorm">0.000</strong> normalized
+            </p>
           </div>
           <div class="diag-card">
             <h3>Buttons (Observed Mapping)</h3>

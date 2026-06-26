@@ -1,28 +1,39 @@
 import { requestSerialPort as requestAnySerialPort } from './webusb-serial.js';
+import { createStreamDecoder, encodeBinaryCommand, initializeCodec } from './codec.js';
 
 // Global state
 let port = null;
 let reader = null;
 let isReading = false;
-const messageBuffer = [];
+let streamDecoder = null;
 
 // UI elements
-let connectBtn, openBtn, closeBtn, statusDiv, lastCommandDiv, dataLog, autoscroll, showRaw, commandInput;
+let connectBtn;
+let openBtn;
+let closeBtn;
+let statusDiv;
+let lastCommandDiv;
+let dataLog;
+let autoscroll;
+let showRaw;
+let commandInput;
+let binaryCommandInput;
+let sendBinaryBtn;
 
 // Log utilities
 function log(message, type = 'data', raw = null) {
     const timestamp = new Date().toLocaleTimeString();
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
-    
+
     let displayText = `[${timestamp}] ${message}`;
     if (raw && showRaw.checked) {
         displayText += ` (0x${Array.from(raw).map(b => b.toString(16).padStart(2, '0')).join(' ')})`;
     }
-    
+
     entry.textContent = displayText;
     dataLog.appendChild(entry);
-    
+
     if (autoscroll.checked) {
         dataLog.scrollTop = dataLog.scrollHeight;
     }
@@ -77,6 +88,8 @@ async function openPort() {
         openBtn.disabled = true;
         closeBtn.disabled = false;
         commandInput.disabled = false;
+        binaryCommandInput.disabled = false;
+        sendBinaryBtn.disabled = false;
         log('Port opened at 115200 baud', 'success');
         startReading();
     } catch (err) {
@@ -96,12 +109,17 @@ async function closePort() {
         }
         await port.close();
         port = null;
-        
+        if (streamDecoder) {
+            streamDecoder.reset();
+        }
+
         updateStatus('Port closed', 'info');
         connectBtn.disabled = false;
         openBtn.disabled = true;
         closeBtn.disabled = true;
         commandInput.disabled = true;
+        binaryCommandInput.disabled = true;
+        sendBinaryBtn.disabled = true;
         log('Port closed', 'success');
     } catch (err) {
         updateStatus(`Error closing port: ${err.message}`, 'error');
@@ -114,50 +132,38 @@ async function startReading() {
     if (!port || !port.readable) return;
 
     isReading = true;
-    const textDecoder = new TextDecoderStream();
-    const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-    reader = textDecoder.readable.getReader();
+    reader = port.readable.getReader();
 
     log('Started reading from device', 'success');
-    let incompleteMessage = '';
-    let lastWasData = false;
 
     try {
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
 
-            if (value) {
-                lastWasData = true;
-                const chunk = value;
-                
-                // Log raw bytes if checkbox is enabled
-                if (showRaw.checked) {
-                    const bytes = new TextEncoder().encode(chunk);
-                    log(`Received: ${chunk.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}`, 'data', bytes);
-                }
+            if (!value || value.length === 0) {
+                continue;
+            }
 
-                // Process message boundaries (look for '#' prefix and 0x00 terminator)
-                for (let i = 0; i < chunk.length; i++) {
-                    const char = chunk[i];
-                    
-                    if (char === '#') {
-                        // Start of a new message
-                        if (incompleteMessage) {
-                            // Log any incomplete message before starting new one
-                            log(`Incomplete message ignored: ${incompleteMessage}`, 'error');
-                        }
-                        incompleteMessage = '#';
-                        log('Message boundary: Start (#)', 'message-boundary');
-                    } else if (char === '\0') {
-                        // End of message
-                        if (incompleteMessage.startsWith('#')) {
-                            log(`Message boundary: End (0x00) - Full message: ${incompleteMessage}`, 'message-boundary');
-                            incompleteMessage = '';
-                        }
-                    } else if (incompleteMessage.startsWith('#')) {
-                        incompleteMessage += char;
-                    }
+            const chunk = value;
+
+            if (showRaw.checked) {
+                log(`Received ${chunk.length} byte(s)`, 'data', chunk);
+            }
+
+            if (!streamDecoder) {
+                log('Codec not initialized; skipping decode', 'error');
+                continue;
+            }
+
+            const decoded = streamDecoder.decode_stream(chunk);
+            for (const event of decoded.events) {
+                if (event.kind === 'report') {
+                    log(`Decoded report: ${JSON.stringify(event.report)}`, 'success');
+                } else if (event.kind === 'text') {
+                    log(event.text, 'data');
+                } else if (event.kind === 'decode_error') {
+                    log(event.error, 'error');
                 }
             }
         }
@@ -181,6 +187,44 @@ async function sendTextCommand() {
     }
 }
 
+async function sendBinaryCommandFromInput() {
+    const raw = binaryCommandInput.value.trim();
+    if (!raw) {
+        updateCommandStatus('Binary command input is empty', 'error');
+        return;
+    }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (err) {
+        updateCommandStatus(`Invalid JSON: ${err.message}`, 'error');
+        return;
+    }
+
+    await sendBinaryCommand(parsed);
+}
+
+async function sendBinaryCommand(commandJson) {
+    if (!port || !port.writable) {
+        updateStatus('Port not open', 'error');
+        return;
+    }
+
+    try {
+        const framed = await encodeBinaryCommand(commandJson);
+        const writer = port.writable.getWriter();
+        await writer.write(framed);
+        writer.releaseLock();
+
+        updateCommandStatus('Sent binary command', 'success');
+        log(`Sent binary command: ${JSON.stringify(commandJson)}`, 'command-echo', framed);
+    } catch (err) {
+        updateCommandStatus(`Binary send failed: ${err.message}`, 'error');
+        log(`Binary send failed: ${err.message}`, 'error');
+    }
+}
+
 async function sendCommand(command) {
     if (!port || !port.writable) {
         updateStatus('Port not open', 'error');
@@ -192,7 +236,7 @@ async function sendCommand(command) {
         const data = new TextEncoder().encode(command);
         await writer.write(data);
         writer.releaseLock();
-        
+
         updateCommandStatus(`Sent: "${command}"`, 'success');
         log(`Sent command: "${command}"`, 'command-echo', data);
     } catch (err) {
@@ -219,14 +263,22 @@ export function initializeSerialController() {
     autoscroll = document.getElementById('autoscroll');
     showRaw = document.getElementById('showRaw');
     commandInput = document.getElementById('commandInput');
+    binaryCommandInput = document.getElementById('binaryCommandInput');
+    sendBinaryBtn = document.getElementById('sendBinaryBtn');
 
     // Wire up event listeners
     connectBtn.addEventListener('click', requestSerialPort);
     openBtn.addEventListener('click', openPort);
     closeBtn.addEventListener('click', closePort);
     commandInput.addEventListener('keypress', handleEnter);
+    binaryCommandInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendBinaryCommandFromInput();
+        }
+    });
     document.getElementById('clearLogBtn')?.addEventListener('click', clearLog);
     document.getElementById('sendTextBtn')?.addEventListener('click', sendTextCommand);
+    sendBinaryBtn?.addEventListener('click', sendBinaryCommandFromInput);
 
     // Wire up quick command buttons
     document.querySelectorAll('.quick-cmd').forEach(btn => {
@@ -237,6 +289,17 @@ export function initializeSerialController() {
 
     // Set initial state
     commandInput.disabled = true;
+    binaryCommandInput.disabled = true;
+    sendBinaryBtn.disabled = true;
+
+    initializeCodec()
+        .then(async () => {
+            streamDecoder = await createStreamDecoder();
+            log('WASM codec initialized', 'success');
+        })
+        .catch((err) => {
+            log(`WASM codec init failed: ${err.message}`, 'error');
+        });
 
     // Check browser API availability (desktop Web Serial, Android WebUSB fallback)
     if (!navigator.serial && !navigator.usb) {
@@ -248,4 +311,4 @@ export function initializeSerialController() {
     }
 }
 
-export { sendCommand, sendTextCommand }
+export { sendBinaryCommand, sendCommand, sendTextCommand }
