@@ -36,9 +36,15 @@ Build a phone-first controller workflow for field use:
 ### Deliverable
 A minimal web page served on Tailnet that can open serial, send ping/input, and display incoming text/binary decode status.
 
+### Status (2026-06-26)
+- Implemented in `./pommel` as a Vite app.
+- Android device selection works via WebUSB fallback (desktop still uses Web Serial).
+- Connect now auto-opens the selected port (Open Port remains available as a manual retry path).
+- Incoming stream is visible; binary telemetry flood observed after ESP32 reset (expected for current firmware).
+
 ### Tasks
 1. Create a minimal web app page with:
-- Connect button (calls navigator.serial.requestPort()).
+- Connect button (uses unified picker: Web Serial on desktop, WebUSB fallback on Android).
 - Open/close port controls.
 - Text input and send button for raw test commands.
 - Read loop that logs incoming bytes and message boundaries.
@@ -53,9 +59,9 @@ A minimal web page served on Tailnet that can open serial, send ping/input, and 
 - Confirm readable responses and stable reconnect behavior.
 
 ### Acceptance criteria
-- Phone can connect to board serial from the Tailnet URL.
-- At least one command/response round-trip succeeds.
-- Unplug/replug recovery works without browser restart.
+- [x] Phone can connect to board serial from the Tailnet URL.
+- [x] At least one command/response round-trip succeeds.
+- [x] Unplug/replug recovery works without browser restart.
 
 ## Phase 2: Verify Web Gamepad on Android Chrome
 ### Deliverable

@@ -1,12 +1,22 @@
-# Kitesabre Web Serial Controller
+# Pommel
 
 ## Phase 1: Web Serial Testing Application
 
-This is a minimal web app for testing serial communication with Kitesabre firmware over Web Serial API.
+Pommel is a minimal web app for testing serial communication with Kitesabre firmware.
+
+Connection transport behavior:
+- Desktop browsers use Web Serial when available.
+- Android Chrome uses a WebUSB fallback so USB serial adapters (for example M5Stack bridges) enumerate reliably.
+
+## Attribution
+
+The Android WebUSB fallback in this project is adapted from these MIT-licensed projects:
+- Jason2866/WebSerial_ESPTool: https://github.com/Jason2866/WebSerial_ESPTool
+- adafruit/Adafruit_WebSerial_ESPTool: https://github.com/adafruit/Adafruit_WebSerial_ESPTool
 
 ### Features
 
-- **Connect Button**: Uses `navigator.serial.requestPort()` to select a serial device
+- **Connect Button**: Uses a unified port picker (`Web Serial` on desktop, `WebUSB` fallback on Android)
 - **Open/Close Controls**: Manage the serial connection at 115200 baud
 - **Text Input**: Send arbitrary text commands to the device
 - **Quick Command Buttons**: Pre-configured buttons for common commands (ping, help, arrows)
@@ -24,7 +34,7 @@ This is a minimal web app for testing serial communication with Kitesabre firmwa
 #### Option 1: Simple Python HTTP Server
 
 ```bash
-cd kitesabre/web
+cd kitesabre/pommel
 python3 -m http.server 8000
 ```
 
@@ -35,7 +45,7 @@ Then open `http://localhost:8000` in your browser.
 #### Option 2: Using `http-server` (npm)
 
 ```bash
-cd kitesabre/web
+cd kitesabre/pommel
 npx http-server -p 8000
 ```
 
@@ -49,7 +59,7 @@ For accessing from a phone on cellular or Wi-Fi, you need to host over HTTPS on 
 2. Share the web directory:
 
 ```bash
-cd kitesabre/web
+cd kitesabre/pommel
 tailscale serve file .
 ```
 
@@ -73,7 +83,7 @@ openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 36
 2. Use Node.js with HTTPS:
 
 ```bash
-cd kitesabre/web
+cd kitesabre/pommel
 npm install --save-dev node-static
 node server.js
 ```

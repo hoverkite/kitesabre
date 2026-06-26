@@ -1,3 +1,5 @@
+import { requestSerialPort as requestAnySerialPort } from './webusb-serial.js';
+
 // Global state
 let port = null;
 let reader = null;
@@ -43,11 +45,20 @@ function updateCommandStatus(text, type = 'info') {
 // Web Serial API
 async function requestSerialPort() {
     try {
-        port = await navigator.serial.requestPort();
-        updateStatus('Port selected. Click "Open Port" to connect.', 'info');
+        port = await requestAnySerialPort((msg) => log(msg, 'info'));
+        const info = typeof port.getInfo === 'function' ? port.getInfo() : {};
+        if (info.usbVendorId) {
+            log(
+                `Selected USB device VID:0x${info.usbVendorId.toString(16).padStart(4, '0')} PID:0x${(info.usbProductId || 0).toString(16).padStart(4, '0')}`,
+                'info',
+            );
+        }
+        updateStatus('Port selected. Opening...', 'info');
         connectBtn.disabled = true;
         openBtn.disabled = false;
-        log('Serial port requested', 'success');
+        log('Port selected; opening automatically', 'success');
+
+        await openPort();
     } catch (err) {
         updateStatus(`Error: ${err.message}`, 'error');
         log(`Request failed: ${err.message}`, 'error');
@@ -227,11 +238,13 @@ export function initializeSerialController() {
     // Set initial state
     commandInput.disabled = true;
 
-    // Check Web Serial API availability
-    if (!navigator.serial) {
-        updateStatus('Web Serial API not available in this browser', 'error');
+    // Check browser API availability (desktop Web Serial, Android WebUSB fallback)
+    if (!navigator.serial && !navigator.usb) {
+        updateStatus('Neither Web Serial nor WebUSB is available in this browser', 'error');
         connectBtn.disabled = true;
-        log('Web Serial API not available', 'error');
+        log('Web Serial/WebUSB APIs not available', 'error');
+    } else if (!navigator.serial && navigator.usb) {
+        log('Web Serial unavailable; using WebUSB fallback', 'info');
     }
 }
 
