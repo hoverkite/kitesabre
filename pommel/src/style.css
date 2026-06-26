@@ -38,6 +38,36 @@ h2 {
 
 .section {
     margin-bottom: 30px;
+    border: 1px solid #e6e8f5;
+    border-radius: 10px;
+    padding: 14px;
+    background: #fbfcff;
+}
+
+.section > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.section > summary::-webkit-details-marker {
+    display: none;
+}
+
+.section > summary h2 {
+    display: inline-block;
+}
+
+.section > summary::after {
+    content: 'Open';
+    float: right;
+    color: #667eea;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.section[open] > summary::after {
+    content: 'Close';
 }
 
 .button-group {
@@ -194,6 +224,73 @@ input[type="checkbox"] {
     color: #858585;
 }
 
+input[type="number"] {
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 90px;
+}
+
+.pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f0f4ff;
+    color: #384ea5;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.diag-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.diag-card {
+    background: #ffffff;
+    border: 1px solid #e6e8f5;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.diag-card h3 {
+    font-size: 15px;
+    color: #4a4f67;
+    margin-bottom: 8px;
+}
+
+.diag-card p {
+    margin: 6px 0;
+    color: #333;
+    font-size: 14px;
+}
+
+.button-state {
+    display: grid;
+    gap: 6px;
+}
+
+.button-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    border-bottom: 1px dashed #e6e8f5;
+    padding-bottom: 4px;
+}
+
+.button-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.button-row .pressed {
+    color: #2e7d32;
+    font-weight: 700;
+}
+
 @media (max-width: 600px) {
     .container {
         padding: 20px;
@@ -213,9 +310,19 @@ input[type="checkbox"] {
         flex-direction: column;
     }
 
+    .controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     button,
     input[type="text"] {
         width: 100%;
+    }
+
+    input[type="number"] {
+        width: 100%;
+        max-width: 160px;
     }
 
     .log {

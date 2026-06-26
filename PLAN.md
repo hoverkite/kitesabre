@@ -67,6 +67,13 @@ A minimal web page served on Tailnet that can open serial, send ping/input, and 
 ### Deliverable
 A gamepad diagnostics page in the same web app showing live axis/button state updates.
 
+### Status (2026-06-26)
+- Implemented in `./pommel` on the homepage as a dedicated "Gamepad Diagnostics (Phase 2)" section.
+- Existing homepage sections are now collapsible (`<details>`), with open/closed state persisted in localStorage across refreshes.
+- Gamepad diagnostics now poll via `requestAnimationFrame`, display live left/right stick Y values (raw + deadzone-normalized), and show an observed Stadia button mapping table.
+- On Android Chrome, system-reserved buttons (for example menu/assistant/home/capture) may not be surfaced via Gamepad API; do not depend on them for critical control actions.
+- Observed mapping on current Android Chrome setup: `...` reports on index 8, hamburger/menu reports on index 9, assistant reports on index 17, and dedicated capture is currently not observed.
+
 ### Tasks
 1. Implement Gamepad API polling.
 - Poll in requestAnimationFrame.
