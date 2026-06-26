@@ -1,5 +1,6 @@
 const DEADZONE_STORAGE_KEY = 'pommel.gamepad.deadzone';
 const DEFAULT_DEADZONE = 0.08;
+export { DEADZONE_STORAGE_KEY, DEFAULT_DEADZONE };
 
 const STADIA_MAPPING = [
     { index: 12, label: 'DPad Up' },
@@ -23,11 +24,11 @@ const STADIA_MAPPING = [
     { index: 18, label: 'Capture (if exposed)' },
 ];
 
-function clamp(value, min, max) {
+export function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function normalizeAxis(value, deadzone) {
+export function normalizeAxis(value, deadzone) {
     const clamped = clamp(value, -1, 1);
     const abs = Math.abs(clamped);
 

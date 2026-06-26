@@ -205,9 +205,13 @@ async function sendBinaryCommandFromInput() {
     await sendBinaryCommand(parsed);
 }
 
-async function sendBinaryCommand(commandJson) {
+async function sendBinaryCommand(commandJson, options = {}) {
+    const { silent = false } = options;
+
     if (!port || !port.writable) {
-        updateStatus('Port not open', 'error');
+        if (!silent) {
+            updateStatus('Port not open', 'error');
+        }
         return;
     }
 
@@ -217,11 +221,15 @@ async function sendBinaryCommand(commandJson) {
         await writer.write(framed);
         writer.releaseLock();
 
-        updateCommandStatus('Sent binary command', 'success');
-        log(`Sent binary command: ${JSON.stringify(commandJson)}`, 'command-echo', framed);
+        if (!silent) {
+            updateCommandStatus('Sent binary command', 'success');
+            log(`Sent binary command: ${JSON.stringify(commandJson)}`, 'command-echo', framed);
+        }
     } catch (err) {
-        updateCommandStatus(`Binary send failed: ${err.message}`, 'error');
-        log(`Binary send failed: ${err.message}`, 'error');
+        if (!silent) {
+            updateCommandStatus(`Binary send failed: ${err.message}`, 'error');
+            log(`Binary send failed: ${err.message}`, 'error');
+        }
     }
 }
 
@@ -311,4 +319,8 @@ export function initializeSerialController() {
     }
 }
 
-export { sendBinaryCommand, sendCommand, sendTextCommand }
+function isSerialWritable() {
+    return Boolean(port && port.writable);
+}
+
+export { sendBinaryCommand, sendCommand, sendTextCommand, isSerialWritable }

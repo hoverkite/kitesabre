@@ -267,6 +267,13 @@ input[type="number"] {
     font-size: 14px;
 }
 
+#phase4LeftOffset,
+#phase4RightOffset,
+#phase4LeftSent,
+#phase4RightSent {
+    font-variant-numeric: tabular-nums;
+}
+
 .button-state {
     display: grid;
     gap: 6px;

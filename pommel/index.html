@@ -109,6 +109,57 @@
           </div>
         </div>
       </details>
+
+      <details class="section" data-section-key="phase4-trivial" open>
+        <summary>
+          <h2>Phase 4 Trivial Mapping</h2>
+        </summary>
+        <div class="controls">
+          <label>
+            <input type="checkbox" id="phase4Enabled" />
+            Enable stick mapping
+          </label>
+          <label for="phase4Scale">Scale:</label>
+          <input
+            type="number"
+            id="phase4Scale"
+            min="0"
+            max="3"
+            step="0.05"
+            value="1.00"
+          />
+          <label for="phase4Hz">Rate (Hz):</label>
+          <input
+            type="number"
+            id="phase4Hz"
+            min="5"
+            max="100"
+            step="1"
+            value="50"
+          />
+        </div>
+        <div id="phase4Status" class="status info">Disabled</div>
+        <div class="diag-grid">
+          <div class="diag-card">
+            <h3>Computed Offsets</h3>
+            <p>
+              Left offset: <strong id="phase4LeftOffset">0.000</strong>
+            </p>
+            <p>
+              Right offset: <strong id="phase4RightOffset">0.000</strong>
+            </p>
+          </div>
+          <div class="diag-card">
+            <h3>Last Sent SetPositions</h3>
+            <p>
+              Left: <strong id="phase4LeftSent">0.000</strong>
+            </p>
+            <p>
+              Right: <strong id="phase4RightSent">0.000</strong>
+            </p>
+          </div>
+        </div>
+      </details>
     </div>
 
     <script type="module" src="/src/main.js"></script>
