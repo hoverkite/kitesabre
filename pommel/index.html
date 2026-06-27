@@ -125,9 +125,10 @@
             id="phase4Scale"
             min="0"
             max="3"
-            step="0.05"
+            step="0.2"
             value="1.00"
           />
+          <span class="pill">Multiplier: <strong id="phase4ScaleValue">1.00x</strong></span>
           <label for="phase4Hz">Rate (Hz):</label>
           <input
             type="number"
@@ -148,6 +149,12 @@
             <p>
               Right offset: <strong id="phase4RightOffset">0.000</strong>
             </p>
+            <p>
+              Left center: <strong id="phase4LeftCenter">0.000</strong>
+            </p>
+            <p>
+              Right center: <strong id="phase4RightCenter">0.000</strong>
+            </p>
           </div>
           <div class="diag-card">
             <h3>Last Sent SetPositions</h3>
@@ -156,6 +163,14 @@
             </p>
             <p>
               Right: <strong id="phase4RightSent">0.000</strong>
+            </p>
+            <p>
+              Left min/max: <strong id="phase4LeftMin">unset</strong> /
+              <strong id="phase4LeftMax">unset</strong>
+            </p>
+            <p>
+              Right min/max: <strong id="phase4RightMin">unset</strong> /
+              <strong id="phase4RightMax">unset</strong>
             </p>
           </div>
         </div>

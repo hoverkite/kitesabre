@@ -269,8 +269,15 @@ input[type="number"] {
 
 #phase4LeftOffset,
 #phase4RightOffset,
+#phase4LeftCenter,
+#phase4RightCenter,
 #phase4LeftSent,
-#phase4RightSent {
+#phase4RightSent,
+#phase4ScaleValue,
+#phase4LeftMin,
+#phase4LeftMax,
+#phase4RightMin,
+#phase4RightMax {
     font-variant-numeric: tabular-nums;
 }
 
