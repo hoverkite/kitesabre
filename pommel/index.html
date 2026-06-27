@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pommel - Kitesabre Web Serial Controller</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Kitesabre Web Serial Controller</h1>
+
+      <details class="section" data-section-key="serial-connection" open>
+        <summary>
+          <h2>Serial Connection</h2>
+        </summary>
+        <div class="button-group">
+          <button id="connectBtn">Connect</button>
+          <button id="openBtn" disabled>Open Port</button>
+          <button id="closeBtn" disabled>Close Port</button>
+        </div>
+        <div id="connectionStatus" class="status">Not connected</div>
+      </details>
+
+      <details class="section" data-section-key="incoming-data" open>
+        <summary>
+          <h2>Incoming Data</h2>
+        </summary>
+        <div class="controls">
+          <button id="clearLogBtn">Clear Log</button>
+          <label>
+            <input type="checkbox" id="autoscroll" checked />
+            Auto-scroll
+          </label>
+          <label>
+            <input type="checkbox" id="showRaw" checked />
+            Show raw bytes
+          </label>
+        </div>
+        <div id="dataLog" class="log"></div>
+      </details>
+
+      <details class="section" data-section-key="send-commands" open>
+        <summary>
+          <h2>Send Commands</h2>
+        </summary>
+        <div class="command-group">
+          <label for="commandInput">Text Command:</label>
+          <input
+            type="text"
+            id="commandInput"
+            placeholder="e.g., p (ping), ? (help), ^ (up), v (down), < (left), > (right)"
+            maxlength="10"
+          />
+          <button id="sendTextBtn">Send</button>
+        </div>
+        <div class="command-group" id="quickCommandsGroup">
+          <button class="quick-cmd" data-cmd="p">Ping (p)</button>
+          <button class="quick-cmd" data-cmd="?">Help (?)</button>
+          <button class="quick-cmd" data-cmd="^">Up (^)</button>
+          <button class="quick-cmd" data-cmd="v">Down (v)</button>
+          <button class="quick-cmd" data-cmd="&lt;">Left (&lt;)</button>
+          <button class="quick-cmd" data-cmd="&gt;">Right (&gt;)</button>
+        </div>
+        <div class="command-group">
+          <label for="binaryCommandInput">Binary Command JSON:</label>
+          <input
+            type="text"
+            id="binaryCommandInput"
+            value='{"SetPositions":{"left":0.0,"right":0.0}}'
+            maxlength="120"
+          />
+          <button id="sendBinaryBtn">Send Binary</button>
+        </div>
+        <div id="lastCommandSent" class="status">No command sent yet</div>
+      </details>
+
+      <details class="section" data-section-key="gamepad-diagnostics" open>
+        <summary>
+          <h2>Gamepad Diagnostics (Phase 2)</h2>
+        </summary>
+        <div class="controls">
+          <label for="deadzoneInput">Deadzone:</label>
+          <input
+            type="number"
+            id="deadzoneInput"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value="0.08"
+          />
+          <span id="pollRate" class="pill">Polling: 0 Hz</span>
+        </div>
+        <div id="gamepadStatus" class="status">No gamepad connected</div>
+        <div class="diag-grid">
+          <div class="diag-card">
+            <h3>Axes</h3>
+            <p>
+              Left Stick Y: <strong id="leftStickYRaw">0.000</strong> raw /
+              <strong id="leftStickYNorm">0.000</strong> normalized
+            </p>
+            <p>
+              Right Stick Y: <strong id="rightStickYRaw">0.000</strong> raw /
+              <strong id="rightStickYNorm">0.000</strong> normalized
+            </p>
+          </div>
+          <div class="diag-card">
+            <h3>Buttons (Observed Mapping)</h3>
+            <div id="buttonState" class="button-state"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" data-section-key="phase4-trivial" open>
+        <summary>
+          <h2>Phase 4 Trivial Mapping</h2>
+        </summary>
+        <div class="controls">
+          <label>
+            <input type="checkbox" id="phase4Enabled" />
+            Enable stick mapping
+          </label>
+          <label for="phase4Scale">Scale:</label>
+          <input
+            type="number"
+            id="phase4Scale"
+            min="0"
+            max="3"
+            step="0.2"
+            value="1.00"
+          />
+          <span class="pill">Multiplier: <strong id="phase4ScaleValue">1.00x</strong></span>
+          <label for="phase4Hz">Rate (Hz):</label>
+          <input
+            type="number"
+            id="phase4Hz"
+            min="5"
+            max="100"
+            step="1"
+            value="50"
+          />
+          <button id="phase4CopyStateBtn" type="button">Copy State JSON</button>
+          <button id="phase4ResetLimitsBtn" type="button">Reset Limits</button>
+        </div>
+        <div id="phase4Status" class="status info">Disabled</div>
+        <div class="diag-grid">
+          <div class="diag-card">
+            <h3>Computed Offsets</h3>
+            <p>
+              Left offset: <strong id="phase4LeftOffset">0.000</strong>
+            </p>
+            <p>
+              Right offset: <strong id="phase4RightOffset">0.000</strong>
+            </p>
+            <p>
+              Left center: <strong id="phase4LeftCenter">0.000</strong>
+            </p>
+            <p>
+              Right center: <strong id="phase4RightCenter">0.000</strong>
+            </p>
+          </div>
+          <div class="diag-card">
+            <h3>Last Sent SetPositions</h3>
+            <p>
+              Left: <strong id="phase4LeftSent">0.000</strong>
+            </p>
+            <p>
+              Right: <strong id="phase4RightSent">0.000</strong>
+            </p>
+            <p>
+              Left min/max: <strong id="phase4LeftMin">unset</strong> /
+              <strong id="phase4LeftMax">unset</strong>
+            </p>
+            <p>
+              Right min/max: <strong id="phase4RightMin">unset</strong> /
+              <strong id="phase4RightMax">unset</strong>
+            </p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
