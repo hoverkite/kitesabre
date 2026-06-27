@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   root: '.',
+  base: process.env.GITHUB_ACTIONS ? '/kitesabre/' : '/',
   build: {
     outDir: 'dist',
     emptyOutDir: true,
