@@ -19,17 +19,17 @@ const BUTTON_INDEX = {
 };
 
 const DEFAULT_STATE = {
-    enabled: false,
-    scale: 1,
+    enabled: true,
+    scale: 0.8,
     hz: 50,
-    leftCenter: 0,
-    rightCenter: 0,
+    leftCenter: 0.6,
+    rightCenter: 0.2,
     leftOffset: 0,
     rightOffset: 0,
-    leftMin: null,
-    leftMax: null,
-    rightMin: null,
-    rightMax: null,
+    leftMin: -0.4,
+    leftMax: 1.4,
+    rightMin: -1.2,
+    rightMax: 1.2,
 };
 
 function parseNullableNumber(value) {
@@ -53,14 +53,14 @@ function readState() {
             enabled: Boolean(parsed.enabled),
             scale: clamp(Number(parsed.scale ?? DEFAULT_STATE.scale), 0, 8),
             hz: clamp(Number(parsed.hz ?? DEFAULT_STATE.hz), 5, 100),
-            leftCenter: Number(parsed.leftCenter ?? 0),
-            rightCenter: Number(parsed.rightCenter ?? 0),
-            leftOffset: Number(parsed.leftOffset ?? 0),
-            rightOffset: Number(parsed.rightOffset ?? 0),
-            leftMin: parseNullableNumber(parsed.leftMin),
-            leftMax: parseNullableNumber(parsed.leftMax),
-            rightMin: parseNullableNumber(parsed.rightMin),
-            rightMax: parseNullableNumber(parsed.rightMax),
+            leftCenter: Number(parsed.leftCenter ?? DEFAULT_STATE.leftCenter),
+            rightCenter: Number(parsed.rightCenter ?? DEFAULT_STATE.rightCenter),
+            leftOffset: Number(parsed.leftOffset ?? DEFAULT_STATE.leftOffset),
+            rightOffset: Number(parsed.rightOffset ?? DEFAULT_STATE.rightOffset),
+            leftMin: parseNullableNumber(parsed.leftMin ?? DEFAULT_STATE.leftMin),
+            leftMax: parseNullableNumber(parsed.leftMax ?? DEFAULT_STATE.leftMax),
+            rightMin: parseNullableNumber(parsed.rightMin ?? DEFAULT_STATE.rightMin),
+            rightMax: parseNullableNumber(parsed.rightMax ?? DEFAULT_STATE.rightMax),
         };
     } catch {
         return { ...DEFAULT_STATE };
@@ -109,6 +109,7 @@ export function initializePhase4TrivialMapping() {
     const scaleInput = document.getElementById('phase4Scale');
     const scaleValueEl = document.getElementById('phase4ScaleValue');
     const hzInput = document.getElementById('phase4Hz');
+    const copyStateBtn = document.getElementById('phase4CopyStateBtn');
     const statusEl = document.getElementById('phase4Status');
     const leftOffsetEl = document.getElementById('phase4LeftOffset');
     const rightOffsetEl = document.getElementById('phase4RightOffset');
@@ -121,7 +122,7 @@ export function initializePhase4TrivialMapping() {
     const leftSentEl = document.getElementById('phase4LeftSent');
     const rightSentEl = document.getElementById('phase4RightSent');
 
-    if (!enabledInput || !scaleInput || !scaleValueEl || !hzInput || !statusEl || !leftOffsetEl || !rightOffsetEl || !leftCenterEl || !rightCenterEl || !leftMinEl || !leftMaxEl || !rightMinEl || !rightMaxEl || !leftSentEl || !rightSentEl) {
+    if (!enabledInput || !scaleInput || !scaleValueEl || !hzInput || !copyStateBtn || !statusEl || !leftOffsetEl || !rightOffsetEl || !leftCenterEl || !rightCenterEl || !leftMinEl || !leftMaxEl || !rightMinEl || !rightMaxEl || !leftSentEl || !rightSentEl) {
         return;
     }
 
@@ -183,6 +184,40 @@ export function initializePhase4TrivialMapping() {
         scaleValueEl.textContent = `${state.scale.toFixed(2)}x`;
     }
 
+    async function copyStateJson() {
+        const exportState = {
+            enabled: state.enabled,
+            scale: state.scale,
+            hz: state.hz,
+            leftCenter: state.leftCenter,
+            rightCenter: state.rightCenter,
+            leftMin: state.leftMin,
+            leftMax: state.leftMax,
+            rightMin: state.rightMin,
+            rightMax: state.rightMax,
+        };
+        const json = JSON.stringify(exportState, null, 2);
+
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(json);
+            return;
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = json;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (!copied) {
+            throw new Error('Clipboard copy failed');
+        }
+    }
+
     function parseScale() {
         const parsed = Number.parseFloat(scaleInput.value);
         if (!Number.isFinite(parsed)) {
@@ -211,6 +246,14 @@ export function initializePhase4TrivialMapping() {
     });
     scaleInput.addEventListener('change', parseScale);
     hzInput.addEventListener('change', parseHz);
+    copyStateBtn.addEventListener('click', async () => {
+        try {
+            await copyStateJson();
+            updateStatus('Copied mapping state JSON to clipboard', 'success');
+        } catch {
+            updateStatus('Failed to copy mapping state JSON', 'error');
+        }
+    });
 
     function readButton(gamepad, index) {
         return Boolean(gamepad.buttons[index]?.pressed);
