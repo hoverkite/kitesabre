@@ -6,6 +6,9 @@ const SCALE_STEP = 0.2;
 const CENTER_STEP = 0.2;
 const CALIBRATION_BUTTON = 2; // West (X)
 const RUMBLE_COOLDOWN_MS = 200;
+const COMMAND_MIN = -1.5;
+const COMMAND_MAX = 1.5;
+const MIN_HARD_STOP_SPAN = 0.6;
 
 const BUTTON_INDEX = {
     dpadLeft: 14,
@@ -104,12 +107,49 @@ function formatLimit(value) {
     return value === null ? 'unset' : value.toFixed(3);
 }
 
+function clampNullable(value, min, max) {
+    if (value === null) {
+        return null;
+    }
+    return clamp(value, min, max);
+}
+
+function enforceReasonableHardStops(state) {
+    let changed = false;
+
+    state.leftMin = clampNullable(state.leftMin, COMMAND_MIN, COMMAND_MAX);
+    state.leftMax = clampNullable(state.leftMax, COMMAND_MIN, COMMAND_MAX);
+    state.rightMin = clampNullable(state.rightMin, COMMAND_MIN, COMMAND_MAX);
+    state.rightMax = clampNullable(state.rightMax, COMMAND_MIN, COMMAND_MAX);
+
+    function ensureRange(minKey, maxKey, defaultMin, defaultMax) {
+        const min = state[minKey];
+        const max = state[maxKey];
+
+        if (min === null || max === null) {
+            return;
+        }
+
+        if (max <= min || (max - min) < MIN_HARD_STOP_SPAN) {
+            state[minKey] = defaultMin;
+            state[maxKey] = defaultMax;
+            changed = true;
+        }
+    }
+
+    ensureRange('leftMin', 'leftMax', DEFAULT_STATE.leftMin, DEFAULT_STATE.leftMax);
+    ensureRange('rightMin', 'rightMax', DEFAULT_STATE.rightMin, DEFAULT_STATE.rightMax);
+
+    return changed;
+}
+
 export function initializePhase4TrivialMapping() {
     const enabledInput = document.getElementById('phase4Enabled');
     const scaleInput = document.getElementById('phase4Scale');
     const scaleValueEl = document.getElementById('phase4ScaleValue');
     const hzInput = document.getElementById('phase4Hz');
     const copyStateBtn = document.getElementById('phase4CopyStateBtn');
+    const resetLimitsBtn = document.getElementById('phase4ResetLimitsBtn');
     const statusEl = document.getElementById('phase4Status');
     const leftOffsetEl = document.getElementById('phase4LeftOffset');
     const rightOffsetEl = document.getElementById('phase4RightOffset');
@@ -122,11 +162,15 @@ export function initializePhase4TrivialMapping() {
     const leftSentEl = document.getElementById('phase4LeftSent');
     const rightSentEl = document.getElementById('phase4RightSent');
 
-    if (!enabledInput || !scaleInput || !scaleValueEl || !hzInput || !copyStateBtn || !statusEl || !leftOffsetEl || !rightOffsetEl || !leftCenterEl || !rightCenterEl || !leftMinEl || !leftMaxEl || !rightMinEl || !rightMaxEl || !leftSentEl || !rightSentEl) {
+    if (!enabledInput || !scaleInput || !scaleValueEl || !hzInput || !copyStateBtn || !resetLimitsBtn || !statusEl || !leftOffsetEl || !rightOffsetEl || !leftCenterEl || !rightCenterEl || !leftMinEl || !leftMaxEl || !rightMinEl || !rightMaxEl || !leftSentEl || !rightSentEl) {
         return;
     }
 
     const state = readState();
+    const repairedStoredLimits = enforceReasonableHardStops(state);
+    if (repairedStoredLimits) {
+        writeState(state);
+    }
     enabledInput.checked = state.enabled;
     scaleInput.value = state.scale.toFixed(2);
     scaleValueEl.textContent = `${state.scale.toFixed(2)}x`;
@@ -254,6 +298,19 @@ export function initializePhase4TrivialMapping() {
             updateStatus('Failed to copy mapping state JSON', 'error');
         }
     });
+    resetLimitsBtn.addEventListener('click', () => {
+        state.leftMin = DEFAULT_STATE.leftMin;
+        state.leftMax = DEFAULT_STATE.leftMax;
+        state.rightMin = DEFAULT_STATE.rightMin;
+        state.rightMax = DEFAULT_STATE.rightMax;
+        refreshLimitUI();
+        persist();
+        updateStatus('Reset hard stops to defaults', 'success');
+    });
+
+    if (repairedStoredLimits) {
+        updateStatus('Repaired invalid/tiny stored hard stops on load', 'info');
+    }
 
     function readButton(gamepad, index) {
         return Boolean(gamepad.buttons[index]?.pressed);
