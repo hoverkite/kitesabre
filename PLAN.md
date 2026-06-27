@@ -203,12 +203,87 @@ Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 - Operator can download the SQLite log database from the UI.
 - Operator can clear logs only after explicit confirmation.
 
+## Phase 6: Bump Rust dependencies for BLE work
+### Deliverable
+Workspace Rust dependencies are updated to versions compatible with the chosen `esp-hal` BLE example and the embedded firmware still builds cleanly for the target board.
+
+### Why this is separate
+- BLE enablement may require coordinated version bumps across `esp-hal`, `esp-backtrace`, `esp-println`, embassy-related crates, and transitive dependencies.
+- That upgrade can create unrelated compile breakage or API churn, so it should be planned and validated independently from the transport design work.
+
+### Tasks
+1. Inventory the current embedded Rust dependency set.
+- Record the current versions and feature flags used by the firmware crates.
+- Compare them with the dependency set expected by the `esp-hal` BLE example.
+
+2. Perform the version bump as a dedicated change.
+- Update embedded Rust dependencies in small, reviewable steps.
+- Resolve feature-flag conflicts and API changes introduced by the upgrade.
+- Keep non-embedded workspace crates pinned unless they are directly affected.
+
+3. Revalidate the firmware baseline after the upgrade.
+- Confirm the existing non-BLE firmware still builds and flashes.
+- Re-run the current serial transport smoke path before layering BLE on top.
+- Capture any new constraints or follow-up cleanup discovered during the upgrade.
+
+### Acceptance criteria
+- The firmware dependency graph is on versions compatible with the intended BLE stack.
+- Existing serial-based behavior still compiles and passes its current smoke checks after the upgrade.
+- Any remaining upgrade fallout is documented before Phase 6 implementation continues.
+
+## Phase 7: Add Web Bluetooth transport
+### Deliverable
+Phone and desktop browsers can connect to Kitesabre over Web Bluetooth using a custom BLE GATT service, with the existing command/report codec reused above the transport layer.
+
+### Why this is a separate phase
+- Web Bluetooth is not a drop-in replacement for WebUSB or Web Serial.
+- Browsers expose BLE GATT, not classic Bluetooth SPP, so the device needs a dedicated BLE protocol surface.
+- The browser app should keep one transport-independent command/report layer, with WebUSB/Web Serial and BLE implemented as interchangeable links.
+
+### Tasks
+1. Define the BLE transport contract.
+- Choose a custom primary service UUID and characteristic layout.
+- Split traffic into at least one write characteristic for commands and one notify characteristic for reports.
+- Keep the current `#` + postcard + COBS + `0x00` framing for consistency across serial and BLE transports.
+- Add a property test that asserts encoded command/report payloads always fit within the chosen BLE MTU budget.
+- For text reports, truncate to the BLE payload budget rather than introducing multi-packet text reassembly.
+
+2. Add firmware BLE support on the ESP32.
+- Start from the `esp-hal` BLE peripheral example (`examples/ble/bas_peripheral/src/main.rs`) and validate that the same stack fits the current async firmware architecture and memory budget.
+- Advertise the Kitesabre service and expose the chosen characteristics.
+- Bridge incoming GATT writes into the existing command handling path.
+- Bridge outgoing reports and telemetry into notifications with backpressure and disconnect handling.
+
+3. Add a browser BLE transport adapter.
+- Implement a `requestBluetoothDevice` flow with filters for the Kitesabre service UUID.
+- Open the GATT server, subscribe to notifications, and expose the same read/write interface used by the current serial transport.
+- Surface transport selection in the UI so operators can choose between Web Serial/WebUSB and Web Bluetooth.
+
+4. Reuse and harden the codec boundary.
+- Keep `kitesabre-webcodec` transport-agnostic so it can sit above both serial and BLE links.
+- Add transport tests that feed chunked BLE notifications through the decoder and verify the same decoded report stream as serial.
+- Verify reconnect behavior, stale-device cleanup, and fail-safe neutral behavior on BLE disconnect.
+
+5. Validate browser and device compatibility.
+- Confirm Android Chrome support on the target phone.
+- Confirm whether desktop Chrome is useful for development, even if field use stays phone-first.
+- Record pairing, permission, and reconnect behavior differences relative to WebUSB.
+
+### Acceptance criteria
+- A supported browser can discover and pair with Kitesabre over Web Bluetooth.
+- The browser can send the same control commands over BLE as over serial, with no protocol-specific application logic above the transport adapter.
+- Incoming reports decode correctly during at least 5 minutes of continuous telemetry.
+- Disconnect or out-of-range events trigger the same neutral/fail-safe behavior as cable disconnects.
+- The plan explicitly documents any remaining BLE-specific limitations, such as throughput or browser support gaps.
+
 ## Milestones
 1. M1: Tailnet-hosted Web Serial smoke test complete.
 2. M2: Gamepad diagnostics page complete with Stadia mapping table.
 3. M3: Rust WASM codec integrated and passing test vectors.
 4. M4: Legacy mapping parity pass complete.
 5. M5: Field test session with no laptop required.
+6. M6: Embedded Rust dependency baseline updated for BLE support.
+7. M7: Optional Web Bluetooth transport reaches parity with the browser serial transport.
 
 ## Suggested implementation order (first week)
 1. Day 1: Phase 1 minimal app and serial connect/send/receive.
@@ -221,3 +296,6 @@ Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 2. What update frequency gives best control feel without saturating serial?
 3. Should command authority require an explicit arm action before motion commands?
 4. Is HTTPS over Tailnet consistently available in your field setup, or do you need a local fallback host?
+5. Which ESP32 BLE stack is the best fit for the current firmware architecture and flash/RAM budget?
+6. Is BLE throughput and latency good enough for the intended control update rate, or should BLE be limited to setup/telemetry while WebUSB remains preferred for active control?
+7. What BLE MTU budget should the codec property test target once the chosen stack and characteristic configuration are wired up?
