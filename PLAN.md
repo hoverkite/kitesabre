@@ -126,15 +126,27 @@ Reference legacy implementation: ../hoverkite/hovercontrol/src/controller.rs
 ### Legacy mapping to preserve
 - [x] [trivial] Axis LeftStickY -> left offset
 - [x] [trivial] Axis RightStickY -> right offset
-- [ ] [browser state] DPadLeft/Right -> scale -/+ 1
-- [ ] [browser state] LeftTrigger / LeftTrigger2 -> left centre +/- 20
-- [ ] [browser state] RightTrigger / RightTrigger2 -> right centre +/- 20
-- [ ] [browser state] LeftThumb / RightThumb -> recenter left/right
+- [x] [browser state] DPadLeft/Right -> scale -/+ 1
+- [x] [browser state] LeftTrigger / LeftTrigger2 -> left centre +/- 20
+- [x] [browser state] RightTrigger / RightTrigger2 -> right centre +/- 20
+- [x] [browser state] LeftThumb / RightThumb -> recenter left/right
 - [ ] [rust-side] DPadUp/Down -> max torque negative limit adjust by 10
 - [ ] [rust-side] East -> remove target
 - [ ] [rust-side] West / North -> spring constant -/+ 2
 - [ ] [rust-side] Mode -> power off
 - [ ] [new board-side code] South -> battery report
+
+### Rewrite track (SolidJS + TypeScript)
+- [ ] Port `./pommel` UI to SolidJS + TypeScript, keeping the current serial/gamepad behavior intact.
+- [ ] Keep translation/calibration logic in testable modules; avoid over-constraining component internals.
+- [ ] Add a small Playwright suite with end-to-end coverage for control streaming and calibration commit/release flow.
+- [ ] Keep Playwright scope intentionally narrow (critical behavior only) so rewrite shape can stay flexible.
+- [ ] Preserve a manual hardware smoke-test checklist for real-device validation after rewrite milestones.
+
+### In-flight naming cleanup
+- Browser code currently uses `phase4` identifiers in file names, DOM ids, CSS selectors, and localStorage keys.
+- We are actively renaming these to neutral `control mapping` names so behavior no longer depends on this plan's phase numbering.
+- Until that lands, treat `phase4` names in the codebase as temporary technical names only.
 
 ### Adaptation for Kitesabre
 #### Easy
