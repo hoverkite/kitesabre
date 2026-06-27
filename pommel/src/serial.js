@@ -1,5 +1,6 @@
 import { requestSerialPort as requestAnySerialPort } from './webusb-serial.js';
 import { createStreamDecoder, encodeBinaryCommand, initializeCodec } from './codec.js';
+import { bytesToHex, emitTelemetry } from './telemetry.js';
 
 // Global state
 let port = null;
@@ -58,6 +59,10 @@ async function requestSerialPort() {
     try {
         port = await requestAnySerialPort((msg) => log(msg, 'info'));
         const info = typeof port.getInfo === 'function' ? port.getInfo() : {};
+        emitTelemetry('serial', 'port_selected', {
+            usbVendorId: info.usbVendorId ?? null,
+            usbProductId: info.usbProductId ?? null,
+        });
         if (info.usbVendorId) {
             log(
                 `Selected USB device VID:0x${info.usbVendorId.toString(16).padStart(4, '0')} PID:0x${(info.usbProductId || 0).toString(16).padStart(4, '0')}`,
@@ -71,6 +76,7 @@ async function requestSerialPort() {
 
         await openPort();
     } catch (err) {
+        emitTelemetry('serial', 'port_select_error', { message: err.message });
         updateStatus(`Error: ${err.message}`, 'error');
         log(`Request failed: ${err.message}`, 'error');
     }
@@ -84,6 +90,7 @@ async function openPort() {
 
     try {
         await port.open({ baudRate: 115200 });
+        emitTelemetry('serial', 'port_opened', { baudRate: 115200 });
         updateStatus('Port opened successfully', 'success');
         openBtn.disabled = true;
         closeBtn.disabled = false;
@@ -93,6 +100,7 @@ async function openPort() {
         log('Port opened at 115200 baud', 'success');
         startReading();
     } catch (err) {
+        emitTelemetry('serial', 'port_open_error', { message: err.message });
         updateStatus(`Error opening port: ${err.message}`, 'error');
         log(`Open failed: ${err.message}`, 'error');
     }
@@ -114,6 +122,7 @@ async function closePort() {
         }
 
         updateStatus('Port closed', 'info');
+        emitTelemetry('serial', 'port_closed');
         connectBtn.disabled = false;
         openBtn.disabled = true;
         closeBtn.disabled = true;
@@ -122,6 +131,7 @@ async function closePort() {
         sendBinaryBtn.disabled = true;
         log('Port closed', 'success');
     } catch (err) {
+        emitTelemetry('serial', 'port_close_error', { message: err.message });
         updateStatus(`Error closing port: ${err.message}`, 'error');
         log(`Close failed: ${err.message}`, 'error');
     }
@@ -135,6 +145,7 @@ async function startReading() {
     reader = port.readable.getReader();
 
     log('Started reading from device', 'success');
+    emitTelemetry('serial', 'read_loop_started');
 
     try {
         while (true) {
@@ -146,6 +157,10 @@ async function startReading() {
             }
 
             const chunk = value;
+            emitTelemetry('serial', 'rx_chunk', {
+                byteLength: chunk.length,
+                hex: bytesToHex(chunk),
+            });
 
             if (showRaw.checked) {
                 log(`Received ${chunk.length} byte(s)`, 'data', chunk);
@@ -153,6 +168,7 @@ async function startReading() {
 
             if (!streamDecoder) {
                 log('Codec not initialized; skipping decode', 'error');
+                emitTelemetry('serial', 'decode_skipped', { reason: 'codec_not_initialized' });
                 continue;
             }
 
@@ -160,20 +176,25 @@ async function startReading() {
             for (const event of decoded.events) {
                 if (event.kind === 'report') {
                     log(`Decoded report: ${JSON.stringify(event.report)}`, 'success');
+                    emitTelemetry('serial', 'decoded_report', { report: event.report });
                 } else if (event.kind === 'text') {
                     log(event.text, 'data');
+                    emitTelemetry('serial', 'decoded_text', { text: event.text });
                 } else if (event.kind === 'decode_error') {
                     log(event.error, 'error');
+                    emitTelemetry('serial', 'decode_error', { error: event.error });
                 }
             }
         }
     } catch (err) {
         if (err.name !== 'AbortError') {
+            emitTelemetry('serial', 'read_error', { message: err.message });
             updateStatus(`Reading error: ${err.message}`, 'error');
             log(`Read error: ${err.message}`, 'error');
         }
     } finally {
         isReading = false;
+        emitTelemetry('serial', 'read_loop_stopped');
         updateStatus('Reading stopped', 'info');
     }
 }
@@ -221,11 +242,19 @@ async function sendBinaryCommand(commandJson, options = {}) {
         await writer.write(framed);
         writer.releaseLock();
 
+        emitTelemetry('serial', 'tx_binary', {
+            command: commandJson,
+            byteLength: framed.length,
+            hex: bytesToHex(framed),
+            silent,
+        });
+
         if (!silent) {
             updateCommandStatus('Sent binary command', 'success');
             log(`Sent binary command: ${JSON.stringify(commandJson)}`, 'command-echo', framed);
         }
     } catch (err) {
+        emitTelemetry('serial', 'tx_binary_error', { message: err.message, command: commandJson });
         if (!silent) {
             updateCommandStatus(`Binary send failed: ${err.message}`, 'error');
             log(`Binary send failed: ${err.message}`, 'error');
@@ -245,9 +274,16 @@ async function sendCommand(command) {
         await writer.write(data);
         writer.releaseLock();
 
+        emitTelemetry('serial', 'tx_text', {
+            command,
+            byteLength: data.length,
+            hex: bytesToHex(data),
+        });
+
         updateCommandStatus(`Sent: "${command}"`, 'success');
         log(`Sent command: "${command}"`, 'command-echo', data);
     } catch (err) {
+        emitTelemetry('serial', 'tx_text_error', { message: err.message, command });
         updateCommandStatus(`Error: ${err.message}`, 'error');
         log(`Send failed: ${err.message}`, 'error');
     }
@@ -314,8 +350,12 @@ export function initializeSerialController() {
         updateStatus('Neither Web Serial nor WebUSB is available in this browser', 'error');
         connectBtn.disabled = true;
         log('Web Serial/WebUSB APIs not available', 'error');
+        emitTelemetry('serial', 'api_unavailable', { webSerial: false, webUsb: false });
     } else if (!navigator.serial && navigator.usb) {
         log('Web Serial unavailable; using WebUSB fallback', 'info');
+        emitTelemetry('serial', 'using_webusb_fallback', { webSerial: false, webUsb: true });
+    } else {
+        emitTelemetry('serial', 'api_available', { webSerial: true, webUsb: Boolean(navigator.usb) });
     }
 }
 

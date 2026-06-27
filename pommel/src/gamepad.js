@@ -2,6 +2,8 @@ const DEADZONE_STORAGE_KEY = 'pommel.gamepad.deadzone';
 const DEFAULT_DEADZONE = 0.08;
 export { DEADZONE_STORAGE_KEY, DEFAULT_DEADZONE };
 
+import { emitTelemetry } from './telemetry.js';
+
 const STADIA_MAPPING = [
     { index: 12, label: 'DPad Up' },
     { index: 13, label: 'DPad Down' },
@@ -68,6 +70,7 @@ export function initializeGamepadDiagnostics() {
     let rafId = null;
     let frameCount = 0;
     let rateStart = performance.now();
+    let telemetryFrame = 0;
 
     function setStatus(text, type = 'info') {
         statusEl.textContent = text;
@@ -81,6 +84,7 @@ export function initializeGamepadDiagnostics() {
         rightRawEl.textContent = '0.000';
         rightNormEl.textContent = '0.000';
         buttonStateEl.innerHTML = '';
+        emitTelemetry('gamepad', 'disconnected_state');
     }
 
     function renderButtons(gamepad) {
@@ -102,14 +106,37 @@ export function initializeGamepadDiagnostics() {
     function renderFrame(gamepad) {
         const leftY = Number(gamepad.axes[1] ?? 0);
         const rightY = Number(gamepad.axes[3] ?? 0);
+        const normalizedLeft = normalizeAxis(leftY, currentDeadzone);
+        const normalizedRight = normalizeAxis(rightY, currentDeadzone);
 
         leftRawEl.textContent = formatAxis(leftY);
         rightRawEl.textContent = formatAxis(rightY);
-        leftNormEl.textContent = formatAxis(normalizeAxis(leftY, currentDeadzone));
-        rightNormEl.textContent = formatAxis(normalizeAxis(rightY, currentDeadzone));
+        leftNormEl.textContent = formatAxis(normalizedLeft);
+        rightNormEl.textContent = formatAxis(normalizedRight);
         renderButtons(gamepad);
 
         setStatus(`Connected: ${gamepad.id} (index ${gamepad.index})`, 'success');
+
+        emitTelemetry('gamepad', 'frame', {
+            frame: telemetryFrame++,
+            id: gamepad.id,
+            index: gamepad.index,
+            connected: gamepad.connected,
+            mapping: gamepad.mapping,
+            timestamp: gamepad.timestamp,
+            deadzone: currentDeadzone,
+            axesRaw: Array.from(gamepad.axes ?? []).map((v) => Number(v ?? 0)),
+            axesNormalized: {
+                leftY: normalizedLeft,
+                rightY: normalizedRight,
+            },
+            buttons: Array.from(gamepad.buttons ?? []).map((b, idx) => ({
+                index: idx,
+                pressed: Boolean(b?.pressed),
+                touched: Boolean(b?.touched),
+                value: Number(b?.value ?? 0),
+            })),
+        });
     }
 
     function updatePollRate() {
@@ -152,16 +179,28 @@ export function initializeGamepadDiagnostics() {
         currentDeadzone = clamp(parsed, 0, 0.5);
         deadzoneInput.value = currentDeadzone.toFixed(2);
         localStorage.setItem(DEADZONE_STORAGE_KEY, String(currentDeadzone));
+        emitTelemetry('gamepad', 'deadzone_changed', { deadzone: currentDeadzone });
     });
 
     window.addEventListener('gamepadconnected', (event) => {
         const gp = event.gamepad;
         setStatus(`Gamepad connected: ${gp.id} (index ${gp.index})`, 'success');
+        emitTelemetry('gamepad', 'connected', {
+            id: gp.id,
+            index: gp.index,
+            mapping: gp.mapping,
+            axesLength: gp.axes.length,
+            buttonsLength: gp.buttons.length,
+        });
     });
 
     window.addEventListener('gamepaddisconnected', (event) => {
         const gp = event.gamepad;
         setStatus(`Gamepad disconnected: ${gp.id} (index ${gp.index})`, 'info');
+        emitTelemetry('gamepad', 'disconnected', {
+            id: gp.id,
+            index: gp.index,
+        });
     });
 
     setDisconnectedState();
