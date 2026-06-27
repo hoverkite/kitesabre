@@ -261,7 +261,7 @@ export function initializePhase4TrivialMapping() {
         }
 
         if (current.leftMinus && !prevButtons.leftMinus) {
-            const next = round3(state.leftCenter - CENTER_STEP);
+            const next = round3(state.leftCenter + CENTER_STEP);
             if (!allowTriggerPastLimits && wouldExceedHardStop(next, leftBaseOffset, state.leftMin, state.leftMax)) {
                 rejectedLimitPress = true;
             } else {
@@ -271,7 +271,7 @@ export function initializePhase4TrivialMapping() {
         }
 
         if (current.leftPlus && !prevButtons.leftPlus) {
-            const next = round3(state.leftCenter + CENTER_STEP);
+            const next = round3(state.leftCenter - CENTER_STEP);
             if (!allowTriggerPastLimits && wouldExceedHardStop(next, leftBaseOffset, state.leftMin, state.leftMax)) {
                 rejectedLimitPress = true;
             } else {
@@ -402,7 +402,7 @@ export function initializePhase4TrivialMapping() {
         const inCalibrationMode = Boolean(calibrationButtonPressed && calibration);
 
         if (!inCalibrationMode) {
-            state.leftOffset = round3(normalizeAxis(Number(gamepad.axes[1] ?? 0), deadzone));
+            state.leftOffset = round3(-normalizeAxis(Number(gamepad.axes[1] ?? 0), deadzone));
             state.rightOffset = round3(normalizeAxis(Number(gamepad.axes[3] ?? 0), deadzone));
         }
         leftOffsetEl.textContent = state.leftOffset.toFixed(3);
